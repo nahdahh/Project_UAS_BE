@@ -1,0 +1,150 @@
+package database
+
+import (
+	"context"
+	"database/sql"
+	"log"
+	"time"
+
+	"uas_be/config"
+
+	_ "github.com/lib/pq"
+)
+
+// InitPostgres membuka koneksi PostgreSQL
+func InitPostgres(cfg *config.Config) *sql.DB {
+	dsn := cfg.Database.GetDSN()
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		log.Fatal("❌ Gagal membuka koneksi PostgreSQL:", err)
+	}
+
+	// Test koneksi database
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := db.PingContext(ctx); err != nil {
+		log.Fatal("❌ Gagal ping database:", err)
+	}
+
+	log.Println("✅ Berhasil terhubung ke PostgreSQL")
+	return db
+}
+
+// InitSchema membuat schema dan tabel awal di database
+func InitSchema(db *sql.DB) error {
+	schema := `
+	-- Tabel roles: menyimpan daftar role (Admin, Mahasiswa, Dosen Wali)
+	CREATE TABLE IF NOT EXISTS roles (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		name VARCHAR(50) UNIQUE NOT NULL,
+		description TEXT,
+		created_at TIMESTAMP DEFAULT NOW()
+	);
+
+	-- Tabel permissions: menyimpan daftar permission yang bisa dilakukan
+	CREATE TABLE IF NOT EXISTS permissions (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		name VARCHAR(100) UNIQUE NOT NULL,
+		resource VARCHAR(50) NOT NULL,
+		action VARCHAR(50) NOT NULL,
+		description TEXT
+	);
+
+	-- Tabel role_permissions: menghubungkan role dengan permissions (many-to-many)
+	CREATE TABLE IF NOT EXISTS role_permissions (
+		role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+		permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+		PRIMARY KEY (role_id, permission_id)
+	);
+
+	-- Tabel users: menyimpan data pengguna sistem
+	CREATE TABLE IF NOT EXISTS users (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		username VARCHAR(50) UNIQUE NOT NULL,
+		email VARCHAR(100) UNIQUE NOT NULL,
+		password_hash VARCHAR(255) NOT NULL,
+		full_name VARCHAR(100) NOT NULL,
+		role_id UUID NOT NULL REFERENCES roles(id),
+		is_active BOOLEAN DEFAULT true,
+		created_at TIMESTAMP DEFAULT NOW(),
+		updated_at TIMESTAMP DEFAULT NOW()
+	);
+
+	-- Tabel lecturers: menyimpan data dosen
+	CREATE TABLE IF NOT EXISTS lecturers (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+		lecturer_id VARCHAR(20) UNIQUE NOT NULL,
+		department VARCHAR(100),
+		created_at TIMESTAMP DEFAULT NOW()
+	);
+
+	-- Tabel students: menyimpan data mahasiswa
+	CREATE TABLE IF NOT EXISTS students (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+		student_id VARCHAR(20) UNIQUE NOT NULL,
+		program_study VARCHAR(100),
+		academic_year VARCHAR(10),
+		advisor_id UUID REFERENCES lecturers(id),
+		created_at TIMESTAMP DEFAULT NOW()
+	);
+
+	-- Tabel achievement_references: menyimpan referensi prestasi (pointer ke MongoDB)
+	CREATE TABLE IF NOT EXISTS achievement_references (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+		achievement_title VARCHAR(255) NOT NULL,
+		status VARCHAR(20) NOT NULL DEFAULT 'draft',
+		submitted_at TIMESTAMP,
+		verified_at TIMESTAMP,
+		verified_by UUID REFERENCES users(id),
+		rejection_note TEXT,
+		created_at TIMESTAMP DEFAULT NOW(),
+		updated_at TIMESTAMP DEFAULT NOW()
+	);
+
+	-- Masukkan data awal untuk roles
+	INSERT INTO roles (name, description) VALUES 
+		('Admin', 'Administrator sistem dengan akses penuh'),
+		('Mahasiswa', 'Pengguna mahasiswa'),
+		('Dosen Wali', 'Dosen pembimbing akademik')
+	ON CONFLICT (name) DO NOTHING;
+
+	-- Masukkan data awal untuk permissions
+	INSERT INTO permissions (name, resource, action, description) VALUES
+		('achievement:create', 'achievement', 'create', 'Membuat prestasi baru'),
+		('achievement:read', 'achievement', 'read', 'Membaca prestasi'),
+		('achievement:update', 'achievement', 'update', 'Mengubah prestasi'),
+		('achievement:delete', 'achievement', 'delete', 'Menghapus prestasi'),
+		('achievement:verify', 'achievement', 'verify', 'Memverifikasi prestasi'),
+		('user:manage', 'user', 'manage', 'Mengelola pengguna')
+	ON CONFLICT (name) DO NOTHING;
+
+	-- Assign permissions ke role Admin (semua permission)
+	INSERT INTO role_permissions (role_id, permission_id)
+	SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'Admin'
+	ON CONFLICT DO NOTHING;
+
+	-- Assign permissions ke role Mahasiswa
+	INSERT INTO role_permissions (role_id, permission_id)
+	SELECT r.id, p.id FROM roles r, permissions p 
+	WHERE r.name = 'Mahasiswa' AND p.name IN ('achievement:create', 'achievement:read', 'achievement:update', 'achievement:delete')
+	ON CONFLICT DO NOTHING;
+
+	-- Assign permissions ke role Dosen Wali
+	INSERT INTO role_permissions (role_id, permission_id)
+	SELECT r.id, p.id FROM roles r, permissions p 
+	WHERE r.name = 'Dosen Wali' AND p.name IN ('achievement:read', 'achievement:verify')
+	ON CONFLICT DO NOTHING;
+	`
+
+	_, err := db.Exec(schema)
+	if err != nil {
+		log.Println("❌ Gagal membuat schema:", err)
+		return err
+	}
+
+	log.Println("✅ Schema berhasil dibuat")
+	return nil
+}
