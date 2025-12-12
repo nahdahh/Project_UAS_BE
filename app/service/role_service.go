@@ -12,34 +12,13 @@ import (
 
 // RoleService adalah interface untuk business logic role/peran
 type RoleService interface {
-	// CreateRole membuat role baru
-	CreateRole(name, description string) (*model.Role, error)
-
-	// GetRoleByID mengambil role berdasarkan ID
-	GetRoleByID(id string) (*model.Role, error)
-
-	// GetRoleByName mengambil role berdasarkan nama
-	GetRoleByName(name string) (*model.Role, error)
-
-	// GetAllRoles mengambil semua role
-	GetAllRoles() ([]*model.Role, error)
-
-	// UpdateRole mengubah data role
-	UpdateRole(id, description string) error
-
-	// AssignPermissionToRole menambahkan permission ke role
-	AssignPermissionToRole(roleID, permissionID string) error
-
-	// RemovePermissionFromRole menghapus permission dari role
-	RemovePermissionFromRole(roleID, permissionID string) error
-
-	// HTTP Handler methods
-	HandleGetAllRoles(c *fiber.Ctx) error
-	HandleGetRoleByID(c *fiber.Ctx) error
-	HandleCreateRole(c *fiber.Ctx) error
-	HandleUpdateRole(c *fiber.Ctx) error
-	HandleAssignPermissionToRole(c *fiber.Ctx) error
-	HandleRemovePermissionFromRole(c *fiber.Ctx) error
+	CreateRole(c *fiber.Ctx) error
+	GetRoleByID(c *fiber.Ctx) error
+	GetRoleByName(c *fiber.Ctx) error
+	GetAllRoles(c *fiber.Ctx) error
+	UpdateRole(c *fiber.Ctx) error
+	AssignPermission(c *fiber.Ctx) error
+	RemovePermission(c *fiber.Ctx) error
 }
 
 // roleServiceImpl adalah implementasi dari RoleService
@@ -59,230 +38,237 @@ func NewRoleService(
 	}
 }
 
-// CreateRole membuat role baru
-func (s *roleServiceImpl) CreateRole(name, description string) (*model.Role, error) {
-	// Validasi input
+func (s *roleServiceImpl) CreateRole(c *fiber.Ctx) error {
+	type CreateRoleRequest struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+
+	req := new(CreateRoleRequest)
+	if err := c.BodyParser(req); err != nil {
+		return helper.ErrorResponse(c, fiber.StatusBadRequest, "format request tidak valid: "+err.Error())
+	}
+
+	role, err := s.createRole(req.Name, req.Description)
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+	}
+
+	return helper.SuccessResponse(c, fiber.StatusCreated, "role berhasil dibuat", role)
+}
+
+func (s *roleServiceImpl) GetRoleByID(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	role, err := s.getRoleByID(id)
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+	}
+	if role == nil {
+		return helper.ErrorResponse(c, fiber.StatusNotFound, "role tidak ditemukan")
+	}
+
+	return helper.SuccessResponse(c, fiber.StatusOK, "role berhasil diambil", role)
+}
+
+func (s *roleServiceImpl) GetRoleByName(c *fiber.Ctx) error {
+	name := c.Params("name")
+
+	role, err := s.getRoleByName(name)
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+	}
+	if role == nil {
+		return helper.ErrorResponse(c, fiber.StatusNotFound, "role tidak ditemukan")
+	}
+
+	return helper.SuccessResponse(c, fiber.StatusOK, "role berhasil diambil", role)
+}
+
+func (s *roleServiceImpl) GetAllRoles(c *fiber.Ctx) error {
+	roles, err := s.getAllRoles()
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+	}
+
+	return helper.SuccessResponse(c, fiber.StatusOK, "roles berhasil diambil", roles)
+}
+
+func (s *roleServiceImpl) UpdateRole(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	type UpdateRoleRequest struct {
+		Description string `json:"description"`
+	}
+
+	req := new(UpdateRoleRequest)
+	if err := c.BodyParser(req); err != nil {
+		return helper.ErrorResponse(c, fiber.StatusBadRequest, "format request tidak valid: "+err.Error())
+	}
+
+	role, err := s.updateRole(id, req.Description)
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+	}
+
+	return helper.SuccessResponse(c, fiber.StatusOK, "role berhasil diupdate", role)
+}
+
+func (s *roleServiceImpl) AssignPermission(c *fiber.Ctx) error {
+	type AssignPermissionRequest struct {
+		RoleID       string `json:"role_id"`
+		PermissionID string `json:"permission_id"`
+	}
+
+	req := new(AssignPermissionRequest)
+	if err := c.BodyParser(req); err != nil {
+		return helper.ErrorResponse(c, fiber.StatusBadRequest, "format request tidak valid: "+err.Error())
+	}
+
+	err := s.assignPermissionToRole(req.RoleID, req.PermissionID)
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+	}
+
+	return helper.SuccessResponse(c, fiber.StatusOK, "permission berhasil ditambahkan ke role", nil)
+}
+
+func (s *roleServiceImpl) RemovePermission(c *fiber.Ctx) error {
+	type RemovePermissionRequest struct {
+		RoleID       string `json:"role_id"`
+		PermissionID string `json:"permission_id"`
+	}
+
+	req := new(RemovePermissionRequest)
+	if err := c.BodyParser(req); err != nil {
+		return helper.ErrorResponse(c, fiber.StatusBadRequest, "format request tidak valid: "+err.Error())
+	}
+
+	err := s.removePermissionFromRole(req.RoleID, req.PermissionID)
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+	}
+
+	return helper.SuccessResponse(c, fiber.StatusOK, "permission berhasil dihapus dari role", nil)
+}
+
+func (s *roleServiceImpl) createRole(name, description string) (*model.Role, error) {
 	if name == "" {
 		return nil, errors.New("nama role tidak boleh kosong")
 	}
 
-	// Cek apakah role sudah ada
-	existing, err := s.roleRepo.GetRoleByName(name)
-	if err != nil {
-		return nil, err
-	}
+	existing, _ := s.roleRepo.GetRoleByName(name)
 	if existing != nil {
 		return nil, errors.New("nama role sudah terdaftar")
 	}
 
-	// Buat role baru
 	role := &model.Role{
 		ID:          uuid.New().String(),
 		Name:        name,
 		Description: description,
 	}
 
-	// Simpan ke database
-	err = s.roleRepo.CreateRole(role)
-	if err != nil {
-		return nil, err
+	if err := s.roleRepo.CreateRole(role); err != nil {
+		return nil, errors.New("gagal membuat role: " + err.Error())
 	}
 
 	return role, nil
 }
 
-// GetRoleByID mengambil role berdasarkan ID
-func (s *roleServiceImpl) GetRoleByID(id string) (*model.Role, error) {
+func (s *roleServiceImpl) getRoleByID(id string) (*model.Role, error) {
+	if id == "" {
+		return nil, errors.New("id tidak boleh kosong")
+	}
+
 	role, err := s.roleRepo.GetRoleByID(id)
 	if err != nil {
-		return nil, err
-	}
-	if role == nil {
-		return nil, errors.New("role tidak ditemukan")
+		return nil, errors.New("gagal mengambil role: " + err.Error())
 	}
 
 	return role, nil
 }
 
-// GetRoleByName mengambil role berdasarkan nama
-func (s *roleServiceImpl) GetRoleByName(name string) (*model.Role, error) {
+func (s *roleServiceImpl) getRoleByName(name string) (*model.Role, error) {
+	if name == "" {
+		return nil, errors.New("name tidak boleh kosong")
+	}
+
 	role, err := s.roleRepo.GetRoleByName(name)
 	if err != nil {
-		return nil, err
-	}
-	if role == nil {
-		return nil, errors.New("role tidak ditemukan")
+		return nil, errors.New("gagal mengambil role: " + err.Error())
 	}
 
 	return role, nil
 }
 
-// GetAllRoles mengambil semua role
-func (s *roleServiceImpl) GetAllRoles() ([]*model.Role, error) {
+func (s *roleServiceImpl) getAllRoles() ([]*model.Role, error) {
 	roles, err := s.roleRepo.GetAllRoles()
 	if err != nil {
-		return nil, err
+		return nil, errors.New("gagal mengambil roles: " + err.Error())
 	}
 
 	return roles, nil
 }
 
-// UpdateRole mengubah data role
-func (s *roleServiceImpl) UpdateRole(id, description string) error {
-	role, err := s.roleRepo.GetRoleByID(id)
-	if err != nil {
-		return err
-	}
-	if role == nil {
-		return errors.New("role tidak ditemukan")
+func (s *roleServiceImpl) updateRole(id, description string) (*model.Role, error) {
+	if id == "" {
+		return nil, errors.New("id tidak boleh kosong")
 	}
 
-	// Update field
+	role, err := s.roleRepo.GetRoleByID(id)
+	if err != nil {
+		return nil, errors.New("gagal mengambil role: " + err.Error())
+	}
+	if role == nil {
+		return nil, errors.New("role tidak ditemukan")
+	}
+
 	if description != "" {
 		role.Description = description
 	}
 
-	return s.roleRepo.UpdateRole(role)
+	if err := s.roleRepo.UpdateRole(role); err != nil {
+		return nil, errors.New("gagal mengupdate role: " + err.Error())
+	}
+
+	return role, nil
 }
 
-// AssignPermissionToRole menambahkan permission ke role
-func (s *roleServiceImpl) AssignPermissionToRole(roleID, permissionID string) error {
-	// Validasi role dan permission ada
-	role, err := s.roleRepo.GetRoleByID(roleID)
-	if err != nil {
-		return err
+func (s *roleServiceImpl) assignPermissionToRole(roleID, permissionID string) error {
+	if roleID == "" || permissionID == "" {
+		return errors.New("role_id dan permission_id tidak boleh kosong")
 	}
+
+	role, _ := s.roleRepo.GetRoleByID(roleID)
 	if role == nil {
 		return errors.New("role tidak ditemukan")
 	}
 
-	permission, err := s.permissionRepo.GetPermissionByID(permissionID)
-	if err != nil {
-		return err
-	}
+	permission, _ := s.permissionRepo.GetPermissionByID(permissionID)
 	if permission == nil {
 		return errors.New("permission tidak ditemukan")
 	}
 
-	// Assign permission ke role
-	return s.roleRepo.AssignPermissionToRole(roleID, permissionID)
+	if err := s.roleRepo.AssignPermissionToRole(roleID, permissionID); err != nil {
+		return errors.New("gagal assign permission ke role: " + err.Error())
+	}
+
+	return nil
 }
 
-// RemovePermissionFromRole menghapus permission dari role
-func (s *roleServiceImpl) RemovePermissionFromRole(roleID, permissionID string) error {
-	// Validasi role ada
-	role, err := s.roleRepo.GetRoleByID(roleID)
-	if err != nil {
-		return err
+func (s *roleServiceImpl) removePermissionFromRole(roleID, permissionID string) error {
+	if roleID == "" || permissionID == "" {
+		return errors.New("role_id dan permission_id tidak boleh kosong")
 	}
+
+	role, _ := s.roleRepo.GetRoleByID(roleID)
 	if role == nil {
 		return errors.New("role tidak ditemukan")
 	}
 
-	// Remove permission dari role
-	return s.roleRepo.RemovePermissionFromRole(roleID, permissionID)
-}
-
-// ===== HTTP HANDLER METHODS (Route Layer) =====
-// Handlers hanya parse input → panggil business logic → return response
-
-// HandleGetAllRoles menangani GET /api/v1/roles
-func (s *roleServiceImpl) HandleGetAllRoles(c *fiber.Ctx) error {
-	roles, err := s.GetAllRoles()
-	if err != nil {
-		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil data role: "+err.Error())
+	if err := s.roleRepo.RemovePermissionFromRole(roleID, permissionID); err != nil {
+		return errors.New("gagal remove permission dari role: " + err.Error())
 	}
 
-	return helper.SuccessResponse(c, fiber.StatusOK, "data role berhasil diambil", roles)
-}
-
-// HandleGetRoleByID menangani GET /api/v1/roles/:id
-func (s *roleServiceImpl) HandleGetRoleByID(c *fiber.Ctx) error {
-	id := c.Params("id")
-	if id == "" {
-		return helper.ErrorResponse(c, fiber.StatusBadRequest, "id tidak boleh kosong")
-	}
-
-	role, err := s.GetRoleByID(id)
-	if err != nil {
-		return helper.ErrorResponse(c, fiber.StatusNotFound, "role tidak ditemukan: "+err.Error())
-	}
-
-	return helper.SuccessResponse(c, fiber.StatusOK, "data role berhasil diambil", role)
-}
-
-// HandleCreateRole menangani POST /api/v1/roles
-func (s *roleServiceImpl) HandleCreateRole(c *fiber.Ctx) error {
-	var req struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-	}
-
-	if err := c.BodyParser(&req); err != nil {
-		return helper.ErrorResponse(c, fiber.StatusBadRequest, "format request tidak valid")
-	}
-
-	role, err := s.CreateRole(req.Name, req.Description)
-	if err != nil {
-		return helper.ErrorResponse(c, fiber.StatusBadRequest, "gagal membuat role: "+err.Error())
-	}
-
-	return helper.SuccessResponse(c, fiber.StatusCreated, "role berhasil dibuat", role)
-}
-
-// HandleUpdateRole menangani PUT /api/v1/roles/:id
-func (s *roleServiceImpl) HandleUpdateRole(c *fiber.Ctx) error {
-	id := c.Params("id")
-	if id == "" {
-		return helper.ErrorResponse(c, fiber.StatusBadRequest, "id tidak boleh kosong")
-	}
-
-	var req struct {
-		Description string `json:"description"`
-	}
-
-	if err := c.BodyParser(&req); err != nil {
-		return helper.ErrorResponse(c, fiber.StatusBadRequest, "format request tidak valid")
-	}
-
-	err := s.UpdateRole(id, req.Description)
-	if err != nil {
-		return helper.ErrorResponse(c, fiber.StatusBadRequest, "gagal mengupdate role: "+err.Error())
-	}
-
-	return helper.SuccessResponse(c, fiber.StatusOK, "role berhasil diupdate", nil)
-}
-
-// HandleAssignPermissionToRole menangani POST /api/v1/roles/:id/permissions/:permissionId
-func (s *roleServiceImpl) HandleAssignPermissionToRole(c *fiber.Ctx) error {
-	roleID := c.Params("id")
-	permissionID := c.Params("permissionId")
-
-	if roleID == "" || permissionID == "" {
-		return helper.ErrorResponse(c, fiber.StatusBadRequest, "role id dan permission id tidak boleh kosong")
-	}
-
-	err := s.AssignPermissionToRole(roleID, permissionID)
-	if err != nil {
-		return helper.ErrorResponse(c, fiber.StatusBadRequest, "gagal assign permission: "+err.Error())
-	}
-
-	return helper.SuccessResponse(c, fiber.StatusOK, "permission berhasil di-assign ke role", nil)
-}
-
-// HandleRemovePermissionFromRole menangani DELETE /api/v1/roles/:id/permissions/:permissionId
-func (s *roleServiceImpl) HandleRemovePermissionFromRole(c *fiber.Ctx) error {
-	roleID := c.Params("id")
-	permissionID := c.Params("permissionId")
-
-	if roleID == "" || permissionID == "" {
-		return helper.ErrorResponse(c, fiber.StatusBadRequest, "role id dan permission id tidak boleh kosong")
-	}
-
-	err := s.RemovePermissionFromRole(roleID, permissionID)
-	if err != nil {
-		return helper.ErrorResponse(c, fiber.StatusBadRequest, "gagal remove permission: "+err.Error())
-	}
-
-	return helper.SuccessResponse(c, fiber.StatusOK, "permission berhasil dihapus dari role", nil)
+	return nil
 }

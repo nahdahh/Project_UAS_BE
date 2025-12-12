@@ -1,19 +1,21 @@
 package service
 
 import (
-	"errors"
+	"strconv"
 	"uas_be/app/model"
 	"uas_be/app/repository"
+
+	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService interface {
-	CreateUser(req *model.CreateUserRequest, roleID string) (*model.User, error)
-	GetUserByID(id string) (*model.UserWithRole, error)
-	GetAllUsers(page, pageSize int) ([]*model.UserWithRole, int, error)
-	UpdateUser(id string, username, email, fullName string) error
-	DeleteUser(id string) error
+	CreateUser(c *fiber.Ctx) error
+	GetUserByID(c *fiber.Ctx) error
+	GetAllUsers(c *fiber.Ctx) error
+	UpdateUser(c *fiber.Ctx) error
+	DeleteUser(c *fiber.Ctx) error
 }
 
 type userServiceImpl struct {
@@ -26,29 +28,48 @@ func NewUserService(userRepo repository.UserRepository) UserService {
 	}
 }
 
-// CreateUser membuat user baru (admin only)
-func (s *userServiceImpl) CreateUser(req *model.CreateUserRequest, roleID string) (*model.User, error) {
-	// Validasi input wajib
-	if req.Username == "" || req.Email == "" || req.Password == "" || req.FullName == "" {
-		return nil, errors.New("semua field harus diisi")
+func (s *userServiceImpl) CreateUser(c *fiber.Ctx) error {
+	req := new(model.CreateUserRequest)
+	if err := c.BodyParser(req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "format request tidak valid: " + err.Error(),
+		})
 	}
 
-	// Business rule: username harus unik
+	// Validasi input
+	if req.Username == "" || req.Email == "" || req.Password == "" || req.FullName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "semua field harus diisi",
+		})
+	}
+
+	// Cek username unik
 	existingUser, _ := s.userRepo.GetUserByUsername(req.Username)
 	if existingUser != nil {
-		return nil, errors.New("username sudah terdaftar")
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "username sudah terdaftar",
+		})
 	}
 
-	// Business rule: email harus unik
+	// Cek email unik
 	existingUser, _ = s.userRepo.GetUserByEmail(req.Email)
 	if existingUser != nil {
-		return nil, errors.New("email sudah terdaftar")
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "email sudah terdaftar",
+		})
 	}
 
-	// Hash password dengan bcrypt
+	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, errors.New("gagal hash password")
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal hash password",
+		})
 	}
 
 	user := &model.User{
@@ -57,47 +78,77 @@ func (s *userServiceImpl) CreateUser(req *model.CreateUserRequest, roleID string
 		Email:        req.Email,
 		PasswordHash: string(hashedPassword),
 		FullName:     req.FullName,
-		RoleID:       roleID,
+		RoleID:       req.RoleID,
 		IsActive:     true,
 	}
 
-	err = s.userRepo.CreateUser(user)
-	if err != nil {
-		return nil, err
+	if err := s.userRepo.CreateUser(user); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal membuat user: " + err.Error(),
+		})
 	}
 
-	return user, nil
+	// HTTP response
+	return c.Status(fiber.StatusCreated).JSON(model.APIResponse{
+		Status:  "success",
+		Message: "user berhasil dibuat",
+		Data:    user,
+	})
 }
 
-// GetUserByID mengambil detail user dengan permissions
-func (s *userServiceImpl) GetUserByID(id string) (*model.UserWithRole, error) {
+func (s *userServiceImpl) GetUserByID(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "id tidak boleh kosong",
+		})
+	}
+
 	user, err := s.userRepo.GetUserByID(id)
 	if err != nil {
-		return nil, err
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengambil user: " + err.Error(),
+		})
 	}
 	if user == nil {
-		return nil, errors.New("user tidak ditemukan")
+		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "user tidak ditemukan",
+		})
 	}
 
-	// Ambil permissions dari role
 	permissions, err := s.userRepo.GetUserPermissions(id)
 	if err != nil {
-		return nil, err
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengambil permissions: " + err.Error(),
+		})
 	}
 
-	return &model.UserWithRole{
-		ID:          user.ID,
-		Username:    user.Username,
-		Email:       user.Email,
-		FullName:    user.FullName,
-		IsActive:    user.IsActive,
-		Permissions: permissions,
-		CreatedAt:   user.CreatedAt.String(),
-	}, nil
+	// HTTP response
+	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
+		Status:  "success",
+		Message: "user berhasil diambil",
+		Data: &model.UserWithRole{
+			ID:          user.ID,
+			Username:    user.Username,
+			Email:       user.Email,
+			FullName:    user.FullName,
+			IsActive:    user.IsActive,
+			Permissions: permissions,
+			CreatedAt:   user.CreatedAt.String(),
+		},
+	})
 }
 
-// GetAllUsers mengambil semua user dengan pagination (admin only)
-func (s *userServiceImpl) GetAllUsers(page, pageSize int) ([]*model.UserWithRole, int, error) {
+func (s *userServiceImpl) GetAllUsers(c *fiber.Ctx) error {
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	pageSize, _ := strconv.Atoi(c.Query("page_size", "10"))
+
 	// Validasi pagination
 	if page < 1 {
 		page = 1
@@ -108,45 +159,125 @@ func (s *userServiceImpl) GetAllUsers(page, pageSize int) ([]*model.UserWithRole
 
 	users, total, err := s.userRepo.GetAllUsers(page, pageSize)
 	if err != nil {
-		return nil, 0, err
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengambil users: " + err.Error(),
+		})
 	}
 
-	return users, total, nil
+	// HTTP response
+	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
+		Status:  "success",
+		Message: "users berhasil diambil",
+		Data: map[string]interface{}{
+			"users": users,
+			"pagination": map[string]interface{}{
+				"page":       page,
+				"page_size":  pageSize,
+				"total":      total,
+				"total_page": (total + pageSize - 1) / pageSize,
+			},
+		},
+	})
 }
 
-// UpdateUser mengupdate data user
-func (s *userServiceImpl) UpdateUser(id string, username, email, fullName string) error {
+func (s *userServiceImpl) UpdateUser(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	type UpdateUserRequest struct {
+		Username string `json:"username"`
+		Email    string `json:"email"`
+		FullName string `json:"full_name"`
+	}
+
+	req := new(UpdateUserRequest)
+	if err := c.BodyParser(req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "format request tidak valid: " + err.Error(),
+		})
+	}
+
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "id tidak boleh kosong",
+		})
+	}
+
 	user, err := s.userRepo.GetUserByID(id)
 	if err != nil {
-		return err
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengambil user: " + err.Error(),
+		})
 	}
 	if user == nil {
-		return errors.New("user tidak ditemukan")
+		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "user tidak ditemukan",
+		})
 	}
 
-	// Hanya update field yang diberikan (optional fields)
-	if username != "" {
-		user.Username = username
+	if req.Username != "" {
+		user.Username = req.Username
 	}
-	if email != "" {
-		user.Email = email
+	if req.Email != "" {
+		user.Email = req.Email
 	}
-	if fullName != "" {
-		user.FullName = fullName
+	if req.FullName != "" {
+		user.FullName = req.FullName
 	}
 
-	return s.userRepo.UpdateUser(user)
+	if err := s.userRepo.UpdateUser(user); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengupdate user: " + err.Error(),
+		})
+	}
+
+	// HTTP response
+	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
+		Status:  "success",
+		Message: "user berhasil diupdate",
+		Data:    user,
+	})
 }
 
-// DeleteUser menghapus user
-func (s *userServiceImpl) DeleteUser(id string) error {
-	user, err := s.userRepo.GetUserByID(id)
-	if err != nil {
-		return err
-	}
-	if user == nil {
-		return errors.New("user tidak ditemukan")
+func (s *userServiceImpl) DeleteUser(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "id tidak boleh kosong",
+		})
 	}
 
-	return s.userRepo.DeleteUser(id)
+	user, err := s.userRepo.GetUserByID(id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengambil user: " + err.Error(),
+		})
+	}
+	if user == nil {
+		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "user tidak ditemukan",
+		})
+	}
+
+	if err := s.userRepo.DeleteUser(id); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal menghapus user: " + err.Error(),
+		})
+	}
+
+	// HTTP response
+	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
+		Status:  "success",
+		Message: "user berhasil dihapus",
+	})
 }

@@ -2,6 +2,7 @@ package helper
 
 import (
 	"strconv"
+	"uas_be/app/model"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -49,4 +50,72 @@ func ExtractPaginationParams(c *fiber.Ctx) (int, int) {
 	}
 
 	return page, pageSize
+}
+
+func GetStatusCodeFromError(err error) int {
+	return getStatusCodeFromError(err)
+}
+
+// getStatusCodeFromError menentukan status code HTTP dari error message
+func getStatusCodeFromError(err error) int {
+	errMsg := err.Error()
+
+	// Not found errors
+	if contains(errMsg, "tidak ditemukan") || contains(errMsg, "not found") {
+		return fiber.StatusNotFound
+	}
+
+	// Unauthorized/Forbidden errors
+	if contains(errMsg, "unauthorized") || contains(errMsg, "bukan milik anda") ||
+		contains(errMsg, "bukan advisor") {
+		return fiber.StatusForbidden
+	}
+
+	// Conflict errors
+	if contains(errMsg, "sudah terdaftar") || contains(errMsg, "sudah ada") ||
+		contains(errMsg, "already exists") {
+		return fiber.StatusConflict
+	}
+
+	// Bad request errors
+	if contains(errMsg, "tidak boleh kosong") || contains(errMsg, "tidak valid") ||
+		contains(errMsg, "hanya") || contains(errMsg, "harus") {
+		return fiber.StatusBadRequest
+	}
+
+	// Default to internal server error
+	return fiber.StatusInternalServerError
+}
+
+// contains helper untuk check substring
+func contains(str, substr string) bool {
+	return len(str) >= len(substr) && (str == substr || len(str) > len(substr) &&
+		(hasSubstring(str, substr)))
+}
+
+func hasSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+// SuccessResponse returns success response without needing fiber.Ctx
+func SuccessResponseSimple(message string, data interface{}) model.APIResponse {
+	return model.APIResponse{
+		Status:  "success",
+		Message: message,
+		Data:    data,
+	}
+}
+
+// ErrorResponse returns error response without needing fiber.Ctx
+func ErrorResponseSimple(message string) model.APIResponse {
+	return model.APIResponse{
+		Status:  "error",
+		Message: message,
+		Data:    nil,
+	}
 }

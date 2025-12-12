@@ -11,10 +11,23 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// Global db variable and getter/setter functions
+var db *sql.DB
+
+// SetDB sets the global database connection
+func SetDB(database *sql.DB) {
+	db = database
+}
+
+// GetDB returns the global database connection
+func GetDB() *sql.DB {
+	return db
+}
+
 // InitPostgres membuka koneksi PostgreSQL
 func InitPostgres(cfg *config.Config) *sql.DB {
 	dsn := cfg.Database.GetDSN()
-	db, err := sql.Open("postgres", dsn)
+	dbConn, err := sql.Open("postgres", dsn)
 	if err != nil {
 		log.Fatal("❌ Gagal membuka koneksi PostgreSQL:", err)
 	}
@@ -22,12 +35,13 @@ func InitPostgres(cfg *config.Config) *sql.DB {
 	// Test koneksi database
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
+	if err := dbConn.PingContext(ctx); err != nil {
 		log.Fatal("❌ Gagal ping database:", err)
 	}
 
 	log.Println("✅ Berhasil terhubung ke PostgreSQL")
-	return db
+	SetDB(dbConn) // Set the global database connection
+	return dbConn
 }
 
 // InitSchema membuat schema dan tabel awal di database
