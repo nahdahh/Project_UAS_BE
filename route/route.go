@@ -11,21 +11,21 @@ import (
 
 func RegisterRoutes(app *fiber.App) {
 	db := database.GetDB()
-	
+
 	achievementRepo := repository.NewAchievementRepository(db)
 	lecturerRepo := repository.NewLecturerRepository(db)
 	studentRepo := repository.NewStudentRepository(db)
 	roleRepo := repository.NewRoleRepository(db)
 	permissionRepo := repository.NewPermissionRepository(db)
 	userRepo := repository.NewUserRepository(db)
-	
+
 	authService := service.NewAuthService(userRepo, permissionRepo)
 	achievementService := service.NewAchievementService(achievementRepo, studentRepo)
 	lecturerService := service.NewLecturerService(lecturerRepo, studentRepo)
 	studentService := service.NewStudentService(studentRepo)
 	roleService := service.NewRoleService(roleRepo, permissionRepo)
 	userService := service.NewUserService(userRepo)
-	
+
 	SetupAuthRoutes(app, authService)
 	SetupAchievementRoutes(app, achievementService)
 	SetupLecturerRoutes(app, lecturerService)
@@ -165,11 +165,14 @@ func SetupUserRoutes(app *fiber.App, userService service.UserService) {
 }
 
 func SetupAuthRoutes(app *fiber.App, authService service.AuthService) {
-	group := app.Group("/api/v1/auth", middleware.AuthMiddleware())
+	auth := app.Group("/api/v1/auth")
 
-	// Login route
-	group.Post("/login", authService.Login)
+	// Login route (no auth required)
+	auth.Post("/login", authService.Login)
+
+	// Protected routes
+	protected := auth.Group("", middleware.AuthMiddleware())
 
 	// Logout route
-	group.Post("/logout", authService.Logout)
+	protected.Post("/logout", authService.Logout)
 }

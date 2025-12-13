@@ -132,7 +132,24 @@ func InitSchema(db *sql.DB) error {
 		('achievement:update', 'achievement', 'update', 'Mengubah prestasi'),
 		('achievement:delete', 'achievement', 'delete', 'Menghapus prestasi'),
 		('achievement:verify', 'achievement', 'verify', 'Memverifikasi prestasi'),
-		('user:manage', 'user', 'manage', 'Mengelola pengguna')
+		('achievement:submit', 'achievement', 'submit', 'Mengajukan prestasi'),
+		('user:create', 'user', 'create', 'Membuat pengguna baru'),
+		('user:read', 'user', 'read', 'Membaca data pengguna'),
+		('user:update', 'user', 'update', 'Mengubah data pengguna'),
+		('user:delete', 'user', 'delete', 'Menghapus pengguna'),
+		('lecturer:create', 'lecturer', 'create', 'Membuat data dosen'),
+		('lecturer:read', 'lecturer', 'read', 'Membaca data dosen'),
+		('lecturer:update', 'lecturer', 'update', 'Mengubah data dosen'),
+		('lecturer:delete', 'lecturer', 'delete', 'Menghapus data dosen'),
+		('student:create', 'student', 'create', 'Membuat data mahasiswa'),
+		('student:read', 'student', 'read', 'Membaca data mahasiswa'),
+		('student:update', 'student', 'update', 'Mengubah data mahasiswa'),
+		('student:delete', 'student', 'delete', 'Menghapus data mahasiswa'),
+		('role:create', 'role', 'create', 'Membuat role baru'),
+		('role:read', 'role', 'read', 'Membaca data role'),
+		('role:update', 'role', 'update', 'Mengubah data role'),
+		('role:assign-permission', 'role', 'assign-permission', 'Menetapkan permission ke role'),
+		('role:remove-permission', 'role', 'remove-permission', 'Menghapus permission dari role')
 	ON CONFLICT (name) DO NOTHING;
 
 	-- Assign permissions ke role Admin (semua permission)

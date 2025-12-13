@@ -30,3 +30,14 @@ func CheckPasswordHash(hash, password string) bool {
 func ComparePassword(hash, password string) bool {
 	return CheckPasswordHash(hash, password)
 }
+
+// GenerateHash adalah helper function untuk generate bcrypt hash
+// Bisa dipanggil dari main.go atau script untuk testing
+func GenerateHash(password string) {
+	hash, err := HashPassword(password)
+	if err != nil {
+		panic(err)
+	}
+	println("Password:", password)
+	println("Hash:", hash)
+}

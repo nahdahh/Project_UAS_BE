@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Database DatabaseConfig
 	Server   ServerConfig
+	JWT      JWTConfig
 }
 
 // DatabaseConfig menyimpan konfigurasi PostgreSQL database
@@ -28,6 +29,11 @@ type ServerConfig struct {
 	Port string // SERVER_PORT - port server (default: 8080)
 }
 
+// JWTConfig menyimpan konfigurasi JWT
+type JWTConfig struct {
+	Secret string // JWT_SECRET - secret key untuk JWT (default: mysecretkey)
+}
+
 // LoadConfig memuat konfigurasi dari environment variables dengan default values
 func LoadConfig() *Config {
 	return &Config{
@@ -42,6 +48,9 @@ func LoadConfig() *Config {
 		Server: ServerConfig{
 			Host: GetEnv("SERVER_HOST", "0.0.0.0"),
 			Port: GetEnv("SERVER_PORT", "8080"),
+		},
+		JWT: JWTConfig{
+			Secret: GetEnv("JWT_SECRET", "mysecretkey"),
 		},
 	}
 }

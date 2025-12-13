@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"time"
 	"uas_be/app/model"
 	"uas_be/app/repository"
@@ -41,44 +42,66 @@ func (s *authServiceImpl) Login(c *fiber.Ctx) error {
 
 	req := new(LoginRequest)
 	if err := c.BodyParser(req); err != nil {
+		fmt.Println("[v0] Body parse error:", err)
 		return helper.ErrorResponse(c, fiber.StatusBadRequest, "format request tidak valid: "+err.Error())
 	}
 
+	fmt.Println("[v0] Login attempt - Username:", req.Username)
+
 	if req.Username == "" || req.Password == "" {
+		fmt.Println("[v0] Empty username or password")
 		return helper.ErrorResponse(c, fiber.StatusBadRequest, "username dan password harus diisi")
 	}
 
 	user, err := s.userRepo.GetUserByUsername(req.Username)
 	if err != nil {
+		fmt.Println("[v0] Database error:", err)
 		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil user")
 	}
 	if user == nil {
+		fmt.Println("[v0] User not found for username:", req.Username)
 		return helper.ErrorResponse(c, fiber.StatusUnauthorized, "username atau password salah")
 	}
 
+	fmt.Println("[v0] User found - ID:", user.ID, "Username:", user.Username)
+	fmt.Println("[v0] User IsActive:", user.IsActive)
+	fmt.Println("[v0] Password hash from DB:", user.PasswordHash)
+	fmt.Println("[v0] Password from request:", req.Password)
+
 	if !user.IsActive {
+		fmt.Println("[v0] User is not active")
 		return helper.ErrorResponse(c, fiber.StatusForbidden, "user tidak aktif")
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
 	if err != nil {
+		fmt.Println("[v0] Password comparison failed:", err)
 		return helper.ErrorResponse(c, fiber.StatusUnauthorized, "username atau password salah")
 	}
 
+	fmt.Println("[v0] Password matched successfully")
+
 	permissionNames, err := s.permissionRepo.GetPermissionsByRoleID(user.RoleID)
 	if err != nil {
+		fmt.Println("[v0] Permission fetch error:", err)
 		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil permissions")
 	}
 
-	token, err := utils.GenerateToken(user.ID, user.RoleID, permissionNames, 24*time.Hour)
+	fmt.Println("[v0] Permissions:", permissionNames)
+
+	token, err := utils.GenerateToken(user.ID, user.Username, user.Email, user.RoleID, permissionNames, 24*time.Hour)
 	if err != nil {
+		fmt.Println("[v0] Token generation error:", err)
 		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal generate token")
 	}
 
-	refreshToken, err := utils.GenerateToken(user.ID, user.RoleID, permissionNames, 7*24*time.Hour)
+	refreshToken, err := utils.GenerateToken(user.ID, user.Username, user.Email, user.RoleID, permissionNames, 7*24*time.Hour)
 	if err != nil {
+		fmt.Println("[v0] Refresh token generation error:", err)
 		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal generate refresh token")
 	}
+
+	fmt.Println("[v0] Login successful for user:", user.Username)
 
 	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
 		Status:  "success",
@@ -170,12 +193,12 @@ func (s *authServiceImpl) RefreshToken(c *fiber.Ctx) error {
 		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil permissions")
 	}
 
-	newToken, err := utils.GenerateToken(user.ID, user.RoleID, permissionNames, 24*time.Hour)
+	newToken, err := utils.GenerateToken(user.ID, user.Username, user.Email, user.RoleID, permissionNames, 24*time.Hour)
 	if err != nil {
 		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal generate token")
 	}
 
-	newRefreshToken, err := utils.GenerateToken(user.ID, user.RoleID, permissionNames, 7*24*time.Hour)
+	newRefreshToken, err := utils.GenerateToken(user.ID, user.Username, user.Email, user.RoleID, permissionNames, 7*24*time.Hour)
 	if err != nil {
 		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal generate refresh token")
 	}

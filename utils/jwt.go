@@ -26,7 +26,7 @@ type Claims struct {
 }
 
 // GenerateToken generates a new JWT token with specified duration
-func GenerateToken(userID, role string, permissions []string, duration time.Duration) (string, error) {
+func GenerateToken(userID, username, email, role string, permissions []string, duration time.Duration) (string, error) {
 	if len(jwtSecret) == 0 {
 		return "", errors.New("JWT secret not initialized")
 	}
@@ -36,6 +36,8 @@ func GenerateToken(userID, role string, permissions []string, duration time.Dura
 
 	claims := &Claims{
 		Sub:         userID,
+		Username:    username,
+		Email:       email,
 		Role:        role,
 		Permissions: permissions,
 		RegisteredClaims: jwt.RegisteredClaims{
