@@ -15,6 +15,9 @@ type PermissionRepository interface {
 
 	// GetAllPermissions mengambil semua permission yang tersedia
 	GetAllPermissions() ([]*model.Permission, error)
+
+	// CreatePermission menambahkan permission baru ke database
+	CreatePermission(permission *model.Permission) error
 }
 
 // permissionRepositoryImpl adalah implementasi dari PermissionRepository
@@ -90,4 +93,14 @@ func (r *permissionRepositoryImpl) GetPermissionByID(id string) (*model.Permissi
 	}
 
 	return p, nil
+}
+
+// CreatePermission menambahkan permission baru ke database
+func (r *permissionRepositoryImpl) CreatePermission(permission *model.Permission) error {
+	query := `
+		INSERT INTO permissions (id, name, resource, action, description)
+		VALUES ($1, $2, $3, $4, $5)
+	`
+	_, err := r.db.Exec(query, permission.ID, permission.Name, permission.Resource, permission.Action, permission.Description)
+	return err
 }

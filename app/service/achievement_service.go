@@ -20,6 +20,8 @@ type AchievementService interface {
 	RejectAchievement(c *fiber.Ctx) error
 	DeleteAchievement(c *fiber.Ctx) error
 	GetAdviseeAchievements(c *fiber.Ctx) error
+	GetAchievementHistory(c *fiber.Ctx) error
+	UploadAttachment(c *fiber.Ctx) error
 }
 
 type achievementServiceImpl struct {
@@ -501,5 +503,129 @@ func (s *achievementServiceImpl) GetAdviseeAchievements(c *fiber.Ctx) error {
 				"total_page": (total + pageSize - 1) / pageSize,
 			},
 		},
+	})
+}
+
+func (s *achievementServiceImpl) GetAchievementHistory(c *fiber.Ctx) error {
+	achievementID := c.Params("id")
+	userID := c.Locals("userID").(string)
+
+	if achievementID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "achievement_id tidak boleh kosong",
+		})
+	}
+
+	achievement, err := s.achievementRepo.GetAchievementByID(achievementID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengambil achievement",
+		})
+	}
+	if achievement == nil {
+		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "achievement tidak ditemukan",
+		})
+	}
+
+	role := c.Locals("role").(string)
+	if role == "Mahasiswa" && achievement.StudentID != userID {
+		return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "unauthorized",
+		})
+	}
+
+	history, err := s.achievementRepo.GetAchievementHistory(achievementID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengambil history",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
+		Status:  "success",
+		Message: "history berhasil diambil",
+		Data:    history,
+	})
+}
+
+func (s *achievementServiceImpl) UploadAttachment(c *fiber.Ctx) error {
+	achievementID := c.Params("id")
+	userID := c.Locals("userID").(string)
+
+	if achievementID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "achievement_id tidak boleh kosong",
+		})
+	}
+
+	achievement, err := s.achievementRepo.GetAchievementByID(achievementID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengambil achievement",
+		})
+	}
+	if achievement == nil {
+		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "achievement tidak ditemukan",
+		})
+	}
+
+	if achievement.StudentID != userID {
+		return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "unauthorized",
+		})
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "file harus diupload",
+		})
+	}
+
+	// Save file to storage (simplified - in production use cloud storage)
+	fileName := uuid.New().String() + "_" + file.Filename
+	filePath := "./uploads/" + fileName
+
+	if err := c.SaveFile(file, filePath); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal menyimpan file",
+		})
+	}
+
+	attachment := &model.AchievementAttachment{
+		ID:            uuid.New().String(),
+		AchievementID: achievementID,
+		FileName:      file.Filename,
+		FileURL:       "/uploads/" + fileName,
+		FileSize:      file.Size,
+		FileType:      file.Header.Get("Content-Type"),
+		UploadedBy:    userID,
+		CreatedAt:     time.Now(),
+	}
+
+	if err := s.achievementRepo.CreateAttachment(attachment); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal menyimpan attachment",
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(model.APIResponse{
+		Status:  "success",
+		Message: "attachment berhasil diupload",
+		Data:    attachment,
 	})
 }

@@ -20,6 +20,11 @@ type AchievementRepository interface {
 	VerifyAchievement(id string, verifiedBy string) error
 	RejectAchievement(id string, verifiedBy string, rejectionNote string) error
 	DeleteAchievement(id string) error
+	
+	CreateAchievementHistory(history *model.AchievementHistory) error
+	GetAchievementHistory(achievementID string) ([]*model.AchievementHistory, error)
+	CreateAttachment(attachment *model.AchievementAttachment) error
+	GetAttachmentsByAchievementID(achievementID string) ([]*model.AchievementAttachment, error)
 }
 
 // achievementRepositoryImpl adalah implementasi dari AchievementRepository
@@ -271,4 +276,81 @@ func (r *achievementRepositoryImpl) DeleteAchievement(id string) error {
 
 	_, err := r.db.Exec(query, id, "draft")
 	return err
+}
+
+// CreateAchievementHistory menyimpan history perubahan status achievement
+func (r *achievementRepositoryImpl) CreateAchievementHistory(history *model.AchievementHistory) error {
+	query := `
+		INSERT INTO achievement_history (id, achievement_id, old_status, new_status, changed_by, note, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())
+	`
+	_, err := r.db.Exec(query, history.ID, history.AchievementID, history.OldStatus, history.NewStatus, history.ChangedBy, history.Note)
+	return err
+}
+
+// GetAchievementHistory mengambil riwayat perubahan achievement
+func (r *achievementRepositoryImpl) GetAchievementHistory(achievementID string) ([]*model.AchievementHistory, error) {
+	query := `
+		SELECT ah.id, ah.achievement_id, ah.old_status, ah.new_status, ah.changed_by, u.full_name, ah.note, ah.created_at
+		FROM achievement_history ah
+		JOIN users u ON ah.changed_by = u.id
+		WHERE ah.achievement_id = $1
+		ORDER BY ah.created_at DESC
+	`
+	
+	rows, err := r.db.Query(query, achievementID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var histories []*model.AchievementHistory
+	for rows.Next() {
+		history := &model.AchievementHistory{}
+		err := rows.Scan(&history.ID, &history.AchievementID, &history.OldStatus, &history.NewStatus, &history.ChangedBy, &history.ChangedByName, &history.Note, &history.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		histories = append(histories, history)
+	}
+	
+	return histories, nil
+}
+
+// CreateAttachment menyimpan attachment file untuk achievement
+func (r *achievementRepositoryImpl) CreateAttachment(attachment *model.AchievementAttachment) error {
+	query := `
+		INSERT INTO achievement_attachments (id, achievement_id, file_name, file_url, file_size, file_type, uploaded_by, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+	`
+	_, err := r.db.Exec(query, attachment.ID, attachment.AchievementID, attachment.FileName, attachment.FileURL, attachment.FileSize, attachment.FileType, attachment.UploadedBy)
+	return err
+}
+
+// GetAttachmentsByAchievementID mengambil semua attachment dari achievement
+func (r *achievementRepositoryImpl) GetAttachmentsByAchievementID(achievementID string) ([]*model.AchievementAttachment, error) {
+	query := `
+		SELECT id, achievement_id, file_name, file_url, file_size, file_type, uploaded_by, created_at
+		FROM achievement_attachments
+		WHERE achievement_id = $1
+		ORDER BY created_at DESC
+	`
+	
+	rows, err := r.db.Query(query, achievementID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var attachments []*model.AchievementAttachment
+	for rows.Next() {
+		attachment := &model.AchievementAttachment{}
+		err := rows.Scan(&attachment.ID, &attachment.AchievementID, &attachment.FileName, &attachment.FileURL, &attachment.FileSize, &attachment.FileType, &attachment.UploadedBy, &attachment.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		attachments = append(attachments, attachment)
+	}
+	
+	return attachments, nil
 }

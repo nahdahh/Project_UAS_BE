@@ -2,6 +2,7 @@ package service
 
 import (
 	"strconv"
+	"strings"
 	"uas_be/app/model"
 	"uas_be/app/repository"
 
@@ -17,15 +18,19 @@ type StudentService interface {
 	GetStudentsByAdvisor(c *fiber.Ctx) error
 	UpdateStudent(c *fiber.Ctx) error
 	DeleteStudent(c *fiber.Ctx) error
+	GetStudentAchievements(c *fiber.Ctx) error
+	UpdateAdvisor(c *fiber.Ctx) error
 }
 
 type studentServiceImpl struct {
-	studentRepo repository.StudentRepository
+	studentRepo     repository.StudentRepository
+	achievementRepo repository.AchievementRepository
 }
 
-func NewStudentService(studentRepo repository.StudentRepository) StudentService {
+func NewStudentService(studentRepo repository.StudentRepository, achievementRepo repository.AchievementRepository) StudentService {
 	return &studentServiceImpl{
-		studentRepo: studentRepo,
+		studentRepo:     studentRepo,
+		achievementRepo: achievementRepo,
 	}
 }
 
@@ -46,11 +51,32 @@ func (s *studentServiceImpl) CreateStudent(c *fiber.Ctx) error {
 		})
 	}
 
+	// Trim spaces
+	req.UserID = strings.TrimSpace(req.UserID)
+	req.StudentID = strings.TrimSpace(req.StudentID)
+	req.AdvisorID = strings.TrimSpace(req.AdvisorID)
+
 	if req.UserID == "" || req.StudentID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
 			Status:  "error",
 			Message: "user_id dan student_id tidak boleh kosong",
 		})
+	}
+
+	if _, err := uuid.Parse(req.UserID); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "user_id harus berformat UUID yang valid",
+		})
+	}
+
+	if req.AdvisorID != "" {
+		if _, err := uuid.Parse(req.AdvisorID); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "advisor_id harus berformat UUID yang valid",
+			})
+		}
 	}
 
 	existing, _ := s.studentRepo.GetStudentByStudentID(req.StudentID)
@@ -227,6 +253,9 @@ func (s *studentServiceImpl) UpdateStudent(c *fiber.Ctx) error {
 		})
 	}
 
+	// Trim spaces
+	req.AdvisorID = strings.TrimSpace(req.AdvisorID)
+
 	if id == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
 			Status:  "error",
@@ -256,6 +285,12 @@ func (s *studentServiceImpl) UpdateStudent(c *fiber.Ctx) error {
 		updateData.AcademicYear = req.AcademicYear
 	}
 	if req.AdvisorID != "" {
+		if _, err := uuid.Parse(req.AdvisorID); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "advisor_id harus berformat UUID yang valid",
+			})
+		}
 		updateData.AdvisorID = req.AdvisorID
 	}
 
@@ -308,5 +343,93 @@ func (s *studentServiceImpl) DeleteStudent(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
 		Status:  "success",
 		Message: "student berhasil dihapus",
+	})
+}
+
+func (s *studentServiceImpl) GetStudentAchievements(c *fiber.Ctx) error {
+	studentID := c.Params("id")
+
+	if studentID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "id tidak boleh kosong",
+		})
+	}
+
+	student, err := s.studentRepo.GetStudentByID(studentID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengambil student: " + err.Error(),
+		})
+	}
+	if student == nil {
+		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "student tidak ditemukan",
+		})
+	}
+
+	achievements, err := s.achievementRepo.GetAchievementsByStudentID(studentID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengambil achievements: " + err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
+		Status:  "success",
+		Message: "achievements berhasil diambil",
+		Data:    achievements,
+	})
+}
+
+func (s *studentServiceImpl) UpdateAdvisor(c *fiber.Ctx) error {
+	studentID := c.Params("id")
+
+	type UpdateAdvisorRequest struct {
+		AdvisorID string `json:"advisor_id"`
+	}
+
+	req := new(UpdateAdvisorRequest)
+	if err := c.BodyParser(req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "format request tidak valid: " + err.Error(),
+		})
+	}
+
+	if studentID == "" || req.AdvisorID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "student_id dan advisor_id harus diisi",
+		})
+	}
+
+	student, err := s.studentRepo.GetStudentByID(studentID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengambil student: " + err.Error(),
+		})
+	}
+	if student == nil {
+		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "student tidak ditemukan",
+		})
+	}
+
+	if err := s.studentRepo.UpdateAdvisor(studentID, req.AdvisorID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal update advisor: " + err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
+		Status:  "success",
+		Message: "advisor berhasil diupdate",
 	})
 }

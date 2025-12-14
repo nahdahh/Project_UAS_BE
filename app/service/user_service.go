@@ -16,6 +16,7 @@ type UserService interface {
 	GetAllUsers(c *fiber.Ctx) error
 	UpdateUser(c *fiber.Ctx) error
 	DeleteUser(c *fiber.Ctx) error
+	AssignRole(c *fiber.Ctx) error
 }
 
 type userServiceImpl struct {
@@ -279,5 +280,54 @@ func (s *userServiceImpl) DeleteUser(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
 		Status:  "success",
 		Message: "user berhasil dihapus",
+	})
+}
+
+func (s *userServiceImpl) AssignRole(c *fiber.Ctx) error {
+	userID := c.Params("id")
+
+	type AssignRoleRequest struct {
+		RoleID string `json:"role_id"`
+	}
+
+	req := new(AssignRoleRequest)
+	if err := c.BodyParser(req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "format request tidak valid: " + err.Error(),
+		})
+	}
+
+	if userID == "" || req.RoleID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "user_id dan role_id harus diisi",
+		})
+	}
+
+	user, err := s.userRepo.GetUserByID(userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengambil user: " + err.Error(),
+		})
+	}
+	if user == nil {
+		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "user tidak ditemukan",
+		})
+	}
+
+	if err := s.userRepo.AssignRole(userID, req.RoleID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal assign role: " + err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
+		Status:  "success",
+		Message: "role berhasil diassign",
 	})
 }
