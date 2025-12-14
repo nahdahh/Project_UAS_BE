@@ -118,6 +118,30 @@ func InitSchema(db *sql.DB) error {
 		updated_at TIMESTAMP DEFAULT NOW()
 	);
 
+	-- Tabel achievement_history: menyimpan riwayat perubahan prestasi
+	CREATE TABLE IF NOT EXISTS achievement_history (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		achievement_id UUID NOT NULL,
+		changed_by UUID NOT NULL REFERENCES users(id),
+		action VARCHAR(50) NOT NULL,
+		previous_status VARCHAR(20),
+		new_status VARCHAR(20),
+		notes TEXT,
+		changed_at TIMESTAMP DEFAULT NOW()
+	);
+
+	-- Tabel achievement_attachments: menyimpan file lampiran prestasi
+	CREATE TABLE IF NOT EXISTS achievement_attachments (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		achievement_id UUID NOT NULL,
+		file_name VARCHAR(255) NOT NULL,
+		file_path VARCHAR(500) NOT NULL,
+		file_type VARCHAR(50),
+		file_size BIGINT,
+		uploaded_by UUID NOT NULL REFERENCES users(id),
+		uploaded_at TIMESTAMP DEFAULT NOW()
+	);
+
 	-- Masukkan data awal untuk roles
 	INSERT INTO roles (name, description) VALUES 
 		('Admin', 'Administrator sistem dengan akses penuh'),
