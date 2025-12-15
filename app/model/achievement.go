@@ -8,6 +8,7 @@ const (
 	AchievementStatusSubmitted = "submitted"
 	AchievementStatusVerified  = "verified"
 	AchievementStatusRejected  = "rejected"
+	AchievementStatusDeleted   = "deleted" // Added "deleted" status for soft delete
 )
 
 // Achievement type constants
@@ -45,6 +46,7 @@ type AchievementReference struct {
 	VerifiedAt         *time.Time `db:"verified_at" json:"verified_at"`
 	VerifiedBy         *string    `db:"verified_by" json:"verified_by"`
 	RejectionNote      *string    `db:"rejection_note" json:"rejection_note"`
+	DeletedAt          *time.Time `db:"deleted_at" json:"deleted_at"` // Added deleted_at field
 	CreatedAt          time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt          time.Time  `db:"updated_at" json:"updated_at"`
 }

@@ -96,7 +96,7 @@ func (r *achievementRepositoryImpl) GetAchievementByID(referenceID string) (*mod
 	// 1. Get reference from PostgreSQL
 	query := `
 		SELECT id, student_id, mongo_achievement_id, achievement_title, status, 
-		       submitted_at, verified_at, verified_by, rejection_note, created_at, updated_at
+		       submitted_at, verified_at, verified_by, rejection_note, deleted_at, created_at, updated_at
 		FROM achievement_references 
 		WHERE id = $1
 	`
@@ -105,7 +105,7 @@ func (r *achievementRepositoryImpl) GetAchievementByID(referenceID string) (*mod
 	err := r.db.QueryRow(query, referenceID).Scan(
 		&ref.ID, &ref.StudentID, &ref.MongoAchievementID, &ref.AchievementTitle,
 		&ref.Status, &ref.SubmittedAt, &ref.VerifiedAt, &ref.VerifiedBy,
-		&ref.RejectionNote, &ref.CreatedAt, &ref.UpdatedAt,
+		&ref.RejectionNote, &ref.DeletedAt, &ref.CreatedAt, &ref.UpdatedAt,
 	)
 
 	if err != nil {
@@ -144,13 +144,13 @@ func (r *achievementRepositoryImpl) GetAchievementsByStudentID(studentID string)
 	// 1. Get all references from PostgreSQL
 	query := `
 		SELECT id, student_id, mongo_achievement_id, achievement_title, status,
-		       submitted_at, verified_at, verified_by, rejection_note, created_at, updated_at
+		       submitted_at, verified_at, verified_by, rejection_note, deleted_at, created_at, updated_at
 		FROM achievement_references
-		WHERE student_id = $1
+		WHERE student_id = $1 AND status != $2
 		ORDER BY created_at DESC
 	`
 
-	rows, err := r.db.Query(query, studentID)
+	rows, err := r.db.Query(query, studentID, model.AchievementStatusDeleted)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (r *achievementRepositoryImpl) GetAchievementsByStudentID(studentID string)
 		err := rows.Scan(
 			&ref.ID, &ref.StudentID, &ref.MongoAchievementID, &ref.AchievementTitle,
 			&ref.Status, &ref.SubmittedAt, &ref.VerifiedAt, &ref.VerifiedBy,
-			&ref.RejectionNote, &ref.CreatedAt, &ref.UpdatedAt,
+			&ref.RejectionNote, &ref.DeletedAt, &ref.CreatedAt, &ref.UpdatedAt,
 		)
 		if err != nil {
 			continue
@@ -200,7 +200,7 @@ func (r *achievementRepositoryImpl) GetAchievementsByStatus(status string) ([]*m
 
 	query := `
 		SELECT id, student_id, mongo_achievement_id, achievement_title, status,
-		       submitted_at, verified_at, verified_by, rejection_note, created_at, updated_at
+		       submitted_at, verified_at, verified_by, rejection_note, deleted_at, created_at, updated_at
 		FROM achievement_references
 		WHERE status = $1
 		ORDER BY created_at DESC
@@ -219,7 +219,7 @@ func (r *achievementRepositoryImpl) GetAchievementsByStatus(status string) ([]*m
 		err := rows.Scan(
 			&ref.ID, &ref.StudentID, &ref.MongoAchievementID, &ref.AchievementTitle,
 			&ref.Status, &ref.SubmittedAt, &ref.VerifiedAt, &ref.VerifiedBy,
-			&ref.RejectionNote, &ref.CreatedAt, &ref.UpdatedAt,
+			&ref.RejectionNote, &ref.DeletedAt, &ref.CreatedAt, &ref.UpdatedAt,
 		)
 		if err != nil {
 			continue
@@ -254,9 +254,9 @@ func (r *achievementRepositoryImpl) GetAllAchievements(page, pageSize int) ([]*m
 	offset := (page - 1) * pageSize
 
 	// Count total
-	countQuery := `SELECT COUNT(*) FROM achievement_references`
+	countQuery := `SELECT COUNT(*) FROM achievement_references WHERE status != $1`
 	var totalItems int
-	err := r.db.QueryRow(countQuery).Scan(&totalItems)
+	err := r.db.QueryRow(countQuery, model.AchievementStatusDeleted).Scan(&totalItems)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -264,13 +264,14 @@ func (r *achievementRepositoryImpl) GetAllAchievements(page, pageSize int) ([]*m
 	// Get paginated references
 	query := `
 		SELECT id, student_id, mongo_achievement_id, achievement_title, status,
-		       submitted_at, verified_at, verified_by, rejection_note, created_at, updated_at
+		       submitted_at, verified_at, verified_by, rejection_note, deleted_at, created_at, updated_at
 		FROM achievement_references
+		WHERE status != $1
 		ORDER BY created_at DESC
-		LIMIT $1 OFFSET $2
+		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := r.db.Query(query, pageSize, offset)
+	rows, err := r.db.Query(query, model.AchievementStatusDeleted, pageSize, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -283,7 +284,7 @@ func (r *achievementRepositoryImpl) GetAllAchievements(page, pageSize int) ([]*m
 		err := rows.Scan(
 			&ref.ID, &ref.StudentID, &ref.MongoAchievementID, &ref.AchievementTitle,
 			&ref.Status, &ref.SubmittedAt, &ref.VerifiedAt, &ref.VerifiedBy,
-			&ref.RejectionNote, &ref.CreatedAt, &ref.UpdatedAt,
+			&ref.RejectionNote, &ref.DeletedAt, &ref.CreatedAt, &ref.UpdatedAt,
 		)
 		if err != nil {
 			continue
@@ -383,33 +384,12 @@ func (r *achievementRepositoryImpl) RejectAchievement(id string, verifiedBy stri
 }
 
 func (r *achievementRepositoryImpl) DeleteAchievement(id string) error {
-	ctx := context.Background()
-
-	// Get MongoDB ID
-	var mongoID string
-	var status string
-	err := r.db.QueryRow("SELECT mongo_achievement_id, status FROM achievement_references WHERE id = $1", id).Scan(&mongoID, &status)
-	if err != nil {
-		return err
-	}
-
-	if status != "draft" {
-		return nil // Only draft can be deleted
-	}
-
-	// Delete from PostgreSQL
-	_, err = r.db.Exec("DELETE FROM achievement_references WHERE id = $1", id)
-	if err != nil {
-		return err
-	}
-
-	// Delete from MongoDB
-	mongoObjID, err := primitive.ObjectIDFromHex(mongoID)
-	if err != nil {
-		return err
-	}
-
-	_, err = r.mongoCollection.DeleteOne(ctx, bson.M{"_id": mongoObjID})
+	query := `
+		UPDATE achievement_references
+		SET status = $1, deleted_at = NOW(), updated_at = NOW()
+		WHERE id = $2 AND status = $3
+	`
+	_, err := r.db.Exec(query, model.AchievementStatusDeleted, id, model.AchievementStatusDraft)
 	return err
 }
 

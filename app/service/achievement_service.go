@@ -91,12 +91,29 @@ func (s *achievementServiceImpl) GetAchievementDetail(c *fiber.Ctx) error {
 		})
 	}
 
+	if achievement.Status == model.AchievementStatusDeleted {
+		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "prestasi tidak ditemukan",
+		})
+	}
+
 	role := c.Locals("role").(string)
 	if role == "Mahasiswa" && achievement.StudentID != studentID {
 		return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
 			Status:  "error",
 			Message: "unauthorized",
 		})
+	}
+
+	if role == "Dosen Wali" {
+		student, err := s.studentRepo.GetStudentByID(achievement.StudentID)
+		if err != nil || student == nil || student.AdvisorID != studentID {
+			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "anda tidak memiliki akses ke prestasi ini",
+			})
+		}
 	}
 
 	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
@@ -154,6 +171,7 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
 	studentID := c.Locals("userID").(string)
+	role := c.Locals("role").(string)
 
 	var req model.UpdateAchievementRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -171,10 +189,17 @@ func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 		})
 	}
 
-	if achievement.StudentID != studentID {
+	if role == "Mahasiswa" && achievement.StudentID != studentID {
 		return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
 			Status:  "error",
 			Message: "prestasi bukan milik anda",
+		})
+	}
+
+	if role == "Dosen Wali" {
+		return c.Status(fiber.StatusForbidden).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "dosen wali tidak dapat mengedit prestasi",
 		})
 	}
 
@@ -266,6 +291,7 @@ func (s *achievementServiceImpl) SubmitAchievement(c *fiber.Ctx) error {
 func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
 	verifiedBy := c.Locals("userID").(string)
+	role := c.Locals("role").(string)
 
 	achievement, err := s.achievementRepo.GetAchievementByID(achievementID)
 	if err != nil || achievement == nil {
@@ -282,19 +308,28 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 		})
 	}
 
-	student, _ := s.studentRepo.GetStudentByID(achievement.StudentID)
-	if student == nil {
-		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
+	if role == "Mahasiswa" {
+		return c.Status(fiber.StatusForbidden).JSON(model.APIResponse{
 			Status:  "error",
-			Message: "student tidak ditemukan",
+			Message: "mahasiswa tidak dapat memverifikasi prestasi",
 		})
 	}
 
-	if student.AdvisorID != verifiedBy {
-		return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
-			Status:  "error",
-			Message: "anda bukan advisor dari student ini",
-		})
+	if role == "Dosen Wali" {
+		student, _ := s.studentRepo.GetStudentByID(achievement.StudentID)
+		if student == nil {
+			return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "student tidak ditemukan",
+			})
+		}
+
+		if student.AdvisorID != verifiedBy {
+			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "anda bukan advisor dari student ini",
+			})
+		}
 	}
 
 	if err := s.achievementRepo.VerifyAchievement(achievementID, verifiedBy); err != nil {
@@ -316,6 +351,7 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
 	rejectedBy := c.Locals("userID").(string)
+	role := c.Locals("role").(string)
 
 	type RejectRequest struct {
 		RejectionNote string `json:"rejection_note"`
@@ -344,19 +380,28 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 		})
 	}
 
-	student, _ := s.studentRepo.GetStudentByID(achievement.StudentID)
-	if student == nil {
-		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
+	if role == "Mahasiswa" {
+		return c.Status(fiber.StatusForbidden).JSON(model.APIResponse{
 			Status:  "error",
-			Message: "student tidak ditemukan",
+			Message: "mahasiswa tidak dapat menolak prestasi",
 		})
 	}
 
-	if student.AdvisorID != rejectedBy {
-		return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
-			Status:  "error",
-			Message: "anda bukan advisor dari student ini",
-		})
+	if role == "Dosen Wali" {
+		student, _ := s.studentRepo.GetStudentByID(achievement.StudentID)
+		if student == nil {
+			return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "student tidak ditemukan",
+			})
+		}
+
+		if student.AdvisorID != rejectedBy {
+			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "anda bukan advisor dari student ini",
+			})
+		}
 	}
 
 	if err := s.achievementRepo.RejectAchievement(achievementID, rejectedBy, req.RejectionNote); err != nil {
@@ -378,6 +423,7 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
 	studentID := c.Locals("userID").(string)
+	role := c.Locals("role").(string)
 
 	achievement, err := s.achievementRepo.GetAchievementByID(achievementID)
 	if err != nil || achievement == nil {
@@ -387,10 +433,17 @@ func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
 		})
 	}
 
-	if achievement.StudentID != studentID {
+	if role == "Mahasiswa" && achievement.StudentID != studentID {
 		return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
 			Status:  "error",
 			Message: "prestasi bukan milik anda",
+		})
+	}
+
+	if role == "Dosen Wali" {
+		return c.Status(fiber.StatusForbidden).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "dosen wali tidak dapat menghapus prestasi",
 		})
 	}
 
@@ -416,6 +469,7 @@ func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
 
 func (s *achievementServiceImpl) GetAdviseeAchievements(c *fiber.Ctx) error {
 	advisorID := c.Locals("userID").(string)
+	role := c.Locals("role").(string)
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	pageSize, _ := strconv.Atoi(c.Query("page_size", "10"))
 	status := c.Query("status")
@@ -425,6 +479,13 @@ func (s *achievementServiceImpl) GetAdviseeAchievements(c *fiber.Ctx) error {
 	}
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 10
+	}
+
+	if role == "Mahasiswa" {
+		return c.Status(fiber.StatusForbidden).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "mahasiswa tidak dapat mengakses endpoint ini",
+		})
 	}
 
 	students, err := s.studentRepo.GetStudentsByAdvisorID(advisorID)

@@ -205,6 +205,7 @@ func InitSchema(db *sql.DB) error {
 		verified_at TIMESTAMP,
 		verified_by UUID REFERENCES users(id),
 		rejection_note TEXT,
+		deleted_at TIMESTAMP,
 		created_at TIMESTAMP DEFAULT NOW(),
 		updated_at TIMESTAMP DEFAULT NOW()
 	);
@@ -264,7 +265,8 @@ func InitSchema(db *sql.DB) error {
 		('role:read', 'role', 'read', 'Membaca data role'),
 		('role:update', 'role', 'update', 'Mengubah data role'),
 		('role:assign-permission', 'role', 'assign-permission', 'Menetapkan permission ke role'),
-		('role:remove-permission', 'role', 'remove-permission', 'Menghapus permission dari role')
+		('role:remove-permission', 'role', 'remove-permission', 'Menghapus permission dari role'),
+		('report:read', 'report', 'read', 'Membaca laporan dan statistik')
 	ON CONFLICT (name) DO NOTHING;
 
 	-- Assign permissions ke role Admin (semua permission)
@@ -275,7 +277,7 @@ func InitSchema(db *sql.DB) error {
 	-- Assign permissions ke role Mahasiswa
 	INSERT INTO role_permissions (role_id, permission_id)
 	SELECT r.id, p.id FROM roles r, permissions p 
-	WHERE r.name = 'Mahasiswa' AND p.name IN ('achievement:create', 'achievement:read', 'achievement:update', 'achievement:delete')
+	WHERE r.name = 'Mahasiswa' AND p.name IN ('achievement:create', 'achievement:read', 'achievement:update', 'achievement:delete', 'achievement:submit')
 	ON CONFLICT DO NOTHING;
 
 	-- Assign permissions ke role Dosen Wali
@@ -291,6 +293,59 @@ func InitSchema(db *sql.DB) error {
 		return err
 	}
 
+	if err := syncSchemaUpdates(db); err != nil {
+		log.Println("⚠️  Warning: Failed to sync schema updates:", err)
+	}
+
 	log.Println("✅ Schema berhasil dibuat")
+	return nil
+}
+
+// syncSchemaUpdates melakukan sinkronisasi update schema secara otomatis
+// Fungsi ini akan dijalankan setiap kali aplikasi start untuk memastikan schema up-to-date
+func syncSchemaUpdates(db *sql.DB) error {
+	updates := []string{
+		// Update 1: Tambahkan kolom deleted_at jika belum ada
+		`DO $$ 
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM information_schema.columns 
+				WHERE table_name='achievement_references' AND column_name='deleted_at'
+			) THEN
+				ALTER TABLE achievement_references ADD COLUMN deleted_at TIMESTAMP;
+				CREATE INDEX IF NOT EXISTS idx_achievement_references_deleted_at 
+					ON achievement_references(deleted_at) WHERE deleted_at IS NOT NULL;
+				RAISE NOTICE 'Added deleted_at column to achievement_references';
+			END IF;
+		END $$;`,
+
+		// Update 2: Tambahkan index untuk performa query
+		`CREATE INDEX IF NOT EXISTS idx_achievement_references_status 
+			ON achievement_references(status) WHERE status != 'deleted';`,
+
+		`CREATE INDEX IF NOT EXISTS idx_achievement_references_student_status 
+			ON achievement_references(student_id, status) WHERE status != 'deleted';`,
+
+		// Update 3: Pastikan permission report:read ada
+		`INSERT INTO permissions (name, resource, action, description) VALUES
+			('report:read', 'report', 'read', 'Membaca laporan dan statistik')
+		ON CONFLICT (name) DO NOTHING;`,
+
+		// Update 4: Assign report:read permission ke Admin
+		`INSERT INTO role_permissions (role_id, permission_id)
+		SELECT r.id, p.id FROM roles r, permissions p 
+		WHERE r.name = 'Admin' AND p.name = 'report:read'
+		ON CONFLICT DO NOTHING;`,
+	}
+
+	for _, update := range updates {
+		if _, err := db.Exec(update); err != nil {
+			log.Printf("⚠️  Warning: Schema update failed: %v", err)
+			// Continue dengan update lainnya meskipun ada yang gagal
+			continue
+		}
+	}
+
+	log.Println("✅ Schema updates synchronized")
 	return nil
 }
