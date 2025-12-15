@@ -126,22 +126,18 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 		})
 	}
 
-	// Create achievement
+	// Create achievement (will be saved to MongoDB + PostgreSQL reference)
 	achievement := &model.Achievement{
-		ID:              uuid.New().String(),
-		StudentID:       studentID,
 		AchievementType: req.AchievementType,
 		Title:           req.Title,
 		Description:     req.Description,
 		Details:         req.Details,
 		Tags:            req.Tags,
 		Points:          req.Points,
-		Status:          model.AchievementStatusDraft,
-		CreatedAt:       time.Now(),
-		UpdatedAt:       time.Now(),
 	}
 
-	if err := s.achievementRepo.CreateAchievement(achievement); err != nil {
+	result, err := s.achievementRepo.CreateAchievement(achievement, studentID)
+	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
 			Status:  "error",
 			Message: "gagal membuat achievement",
@@ -151,7 +147,7 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(model.APIResponse{
 		Status:  "success",
 		Message: "achievement berhasil dibuat",
-		Data:    achievement,
+		Data:    result,
 	})
 }
 
@@ -209,13 +205,15 @@ func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 		achievement.Points = *req.Points
 	}
 
-	if err := s.achievementRepo.UpdateAchievement(achievement); err != nil {
+	if err := s.achievementRepo.UpdateAchievement(achievementID, &achievement.Achievement); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
 			Status:  "error",
 			Message: "gagal update achievement",
 		})
 	}
 
+	// Refresh data
+	achievement, _ = s.achievementRepo.GetAchievementByID(achievementID)
 	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
 		Status:  "success",
 		Message: "achievement berhasil diupdate",
@@ -442,7 +440,7 @@ func (s *achievementServiceImpl) GetAdviseeAchievements(c *fiber.Ctx) error {
 			Status:  "success",
 			Message: "achievements berhasil diambil",
 			Data: map[string]interface{}{
-				"achievements": []model.Achievement{},
+				"achievements": []*model.AchievementWithReference{},
 				"pagination": map[string]interface{}{
 					"page":       page,
 					"page_size":  pageSize,
@@ -453,7 +451,7 @@ func (s *achievementServiceImpl) GetAdviseeAchievements(c *fiber.Ctx) error {
 		})
 	}
 
-	var achievements []*model.Achievement
+	var achievements []*model.AchievementWithReference
 	if status != "" {
 		achievements, err = s.achievementRepo.GetAchievementsByStatus(status)
 	} else {
@@ -471,7 +469,7 @@ func (s *achievementServiceImpl) GetAdviseeAchievements(c *fiber.Ctx) error {
 		adviseeMap[student.ID] = true
 	}
 
-	var filtered []*model.Achievement
+	var filtered []*model.AchievementWithReference
 	for _, ach := range achievements {
 		if adviseeMap[ach.StudentID] {
 			filtered = append(filtered, ach)
@@ -483,7 +481,7 @@ func (s *achievementServiceImpl) GetAdviseeAchievements(c *fiber.Ctx) error {
 	end := start + pageSize
 
 	if start >= total {
-		filtered = []*model.Achievement{}
+		filtered = []*model.AchievementWithReference{}
 	} else {
 		if end > total {
 			end = total

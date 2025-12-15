@@ -20,23 +20,43 @@ const (
 	AchievementTypeOther         = "other"
 )
 
-// Achievement menyimpan prestasi mahasiswa
+// Achievement menyimpan prestasi mahasiswa di MongoDB
 type Achievement struct {
-	ID              string                 `db:"id" json:"id"`
-	StudentID       string                 `db:"student_id" json:"student_id"`
-	AchievementType string                 `db:"achievement_type" json:"achievement_type"` // academic, competition, organization, publication, certification, other
-	Title           string                 `db:"title" json:"title"`
-	Description     string                 `db:"description" json:"description"`
-	Details         map[string]interface{} `db:"details" json:"details"`   // JSONB - detail dinamis berdasarkan tipe
-	Tags            []string               `db:"tags" json:"tags"`         // Array - tag/kategori prestasi
-	Points          int                    `db:"points" json:"points"`     // Poin prestasi
-	Status          string                 `db:"status" json:"status"`     // Status: draft, submitted, verified, rejected
-	SubmittedAt     *time.Time             `db:"submitted_at" json:"submitted_at"`
-	VerifiedAt      *time.Time             `db:"verified_at" json:"verified_at"`
-	VerifiedBy      *string                `db:"verified_by" json:"verified_by"`
-	RejectionNote   *string                `db:"rejection_note" json:"rejection_note"`
-	CreatedAt       time.Time              `db:"created_at" json:"created_at"`
-	UpdatedAt       time.Time              `db:"updated_at" json:"updated_at"`
+	ID              string                 `bson:"_id,omitempty" json:"id"`
+	StudentID       string                 `bson:"student_id" json:"student_id"`
+	AchievementType string                 `bson:"achievement_type" json:"achievement_type"`
+	Title           string                 `bson:"title" json:"title"`
+	Description     string                 `bson:"description" json:"description"`
+	Details         map[string]interface{} `bson:"details" json:"details"` // Dynamic fields
+	Tags            []string               `bson:"tags" json:"tags"`
+	Points          int                    `bson:"points" json:"points"`
+	CreatedAt       time.Time              `bson:"created_at" json:"created_at"`
+	UpdatedAt       time.Time              `bson:"updated_at" json:"updated_at"`
+}
+
+// AchievementReference menyimpan referensi prestasi di PostgreSQL (pointer ke MongoDB)
+type AchievementReference struct {
+	ID                 string     `db:"id" json:"id"`
+	StudentID          string     `db:"student_id" json:"student_id"`
+	MongoAchievementID string     `db:"mongo_achievement_id" json:"mongo_achievement_id"` // Pointer ke MongoDB ObjectId
+	AchievementTitle   string     `db:"achievement_title" json:"achievement_title"`
+	Status             string     `db:"status" json:"status"`
+	SubmittedAt        *time.Time `db:"submitted_at" json:"submitted_at"`
+	VerifiedAt         *time.Time `db:"verified_at" json:"verified_at"`
+	VerifiedBy         *string    `db:"verified_by" json:"verified_by"`
+	RejectionNote      *string    `db:"rejection_note" json:"rejection_note"`
+	CreatedAt          time.Time  `db:"created_at" json:"created_at"`
+	UpdatedAt          time.Time  `db:"updated_at" json:"updated_at"`
+}
+
+// AchievementWithReference combines MongoDB data with PostgreSQL reference
+type AchievementWithReference struct {
+	Achievement
+	Status        string     `json:"status"`
+	SubmittedAt   *time.Time `json:"submitted_at"`
+	VerifiedAt    *time.Time `json:"verified_at"`
+	VerifiedBy    *string    `json:"verified_by"`
+	RejectionNote *string    `json:"rejection_note"`
 }
 
 // CreateAchievementRequest adalah request untuk membuat prestasi baru

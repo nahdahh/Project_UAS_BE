@@ -9,6 +9,7 @@ import (
 // Config menyimpan semua konfigurasi aplikasi dari environment variables
 type Config struct {
 	Database DatabaseConfig
+	MongoDB  MongoDBConfig // Add MongoDB configuration
 	Server   ServerConfig
 	JWT      JWTConfig
 }
@@ -21,6 +22,13 @@ type DatabaseConfig struct {
 	Password string // DB_PASSWORD - password database (default: postgres)
 	DBName   string // DB_NAME - nama database (default: uas_be_db)
 	SSLMode  string // DB_SSLMODE - SSL mode connection (default: disable)
+}
+
+// MongoDBConfig menyimpan konfigurasi MongoDB untuk data prestasi
+type MongoDBConfig struct {
+	URI        string // MONGO_URI - MongoDB connection URI
+	Database   string // MONGO_DB_NAME - nama database MongoDB (default: uas_achievements_db)
+	Collection string // Collection name for achievements (default: achievements)
 }
 
 // ServerConfig menyimpan konfigurasi server Fiber
@@ -44,6 +52,11 @@ func LoadConfig() *Config {
 			Password: GetEnv("DB_PASSWORD", "postgres"),
 			DBName:   GetEnv("DB_NAME", "uas_be_db"),
 			SSLMode:  GetEnv("DB_SSLMODE", "disable"),
+		},
+		MongoDB: MongoDBConfig{
+			URI:        GetEnv("MONGO_URI", "mongodb://localhost:27017"),
+			Database:   GetEnv("MONGO_DB_NAME", "uas_achievements_db"),
+			Collection: "achievements",
 		},
 		Server: ServerConfig{
 			Host: GetEnv("SERVER_HOST", "0.0.0.0"),

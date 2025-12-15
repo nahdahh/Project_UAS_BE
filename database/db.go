@@ -9,10 +9,14 @@ import (
 	"uas_be/config"
 
 	_ "github.com/lib/pq"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// Global db variable and getter/setter functions
+// Global db variables
 var db *sql.DB
+var mongoClient *mongo.Client // Add MongoDB client
+var mongoDB *mongo.Database   // Add MongoDB database reference
 
 // SetDB sets the global database connection
 func SetDB(database *sql.DB) {
@@ -22,6 +26,22 @@ func SetDB(database *sql.DB) {
 // GetDB returns the global database connection
 func GetDB() *sql.DB {
 	return db
+}
+
+// SetMongoDB sets the global MongoDB connection
+func SetMongoDB(client *mongo.Client, database *mongo.Database) {
+	mongoClient = client
+	mongoDB = database
+}
+
+// GetMongoDB returns the global MongoDB database
+func GetMongoDB() *mongo.Database {
+	return mongoDB
+}
+
+// GetMongoClient returns the global MongoDB client
+func GetMongoClient() *mongo.Client {
+	return mongoClient
 }
 
 // InitPostgres membuka koneksi PostgreSQL
@@ -42,6 +62,75 @@ func InitPostgres(cfg *config.Config) *sql.DB {
 	log.Println("✅ Berhasil terhubung ke PostgreSQL")
 	SetDB(dbConn) // Set the global database connection
 	return dbConn
+}
+
+// InitMongoDB membuka koneksi MongoDB untuk menyimpan data prestasi
+func InitMongoDB(cfg *config.Config) (*mongo.Client, *mongo.Database, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Connect to MongoDB
+	clientOptions := options.Client().ApplyURI(cfg.MongoDB.URI)
+	client, err := mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Test koneksi MongoDB
+	if err := client.Ping(ctx, nil); err != nil {
+		return nil, nil, err
+	}
+
+	database := client.Database(cfg.MongoDB.Database)
+	SetMongoDB(client, database)
+
+	if err := InitMongoCollections(database, cfg.MongoDB.Collection); err != nil {
+		log.Println("⚠️  Warning: Failed to initialize MongoDB collections:", err)
+	}
+
+	log.Printf("✅ Berhasil terhubung ke MongoDB - Database: %s", cfg.MongoDB.Database)
+	return client, database, nil
+}
+
+// InitMongoCollections membuat collection dan indexes di MongoDB
+func InitMongoCollections(db *mongo.Database, collectionName string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Get atau create collection
+	collection := db.Collection(collectionName)
+
+	// Create indexes untuk performa query
+	indexes := []mongo.IndexModel{
+		{
+			Keys: map[string]interface{}{
+				"studentId": 1,
+			},
+		},
+		{
+			Keys: map[string]interface{}{
+				"achievementType": 1,
+			},
+		},
+		{
+			Keys: map[string]interface{}{
+				"createdAt": -1,
+			},
+		},
+		{
+			Keys: map[string]interface{}{
+				"tags": 1,
+			},
+		},
+	}
+
+	_, err := collection.Indexes().CreateMany(ctx, indexes)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("✅ MongoDB collection '%s' siap digunakan dengan indexes", collectionName)
+	return nil
 }
 
 // InitSchema membuat schema dan tabel awal di database
@@ -104,10 +193,12 @@ func InitSchema(db *sql.DB) error {
 		created_at TIMESTAMP DEFAULT NOW()
 	);
 
+	-- Update achievement_references table - this is now the primary reference table
 	-- Tabel achievement_references: menyimpan referensi prestasi (pointer ke MongoDB)
 	CREATE TABLE IF NOT EXISTS achievement_references (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+		mongo_achievement_id VARCHAR(24) NOT NULL,
 		achievement_title VARCHAR(255) NOT NULL,
 		status VARCHAR(20) NOT NULL DEFAULT 'draft',
 		submitted_at TIMESTAMP,
@@ -121,7 +212,7 @@ func InitSchema(db *sql.DB) error {
 	-- Tabel achievement_history: menyimpan riwayat perubahan prestasi
 	CREATE TABLE IF NOT EXISTS achievement_history (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-		achievement_id UUID NOT NULL,
+		achievement_id UUID NOT NULL REFERENCES achievement_references(id),
 		changed_by UUID NOT NULL REFERENCES users(id),
 		action VARCHAR(50) NOT NULL,
 		previous_status VARCHAR(20),
@@ -133,7 +224,7 @@ func InitSchema(db *sql.DB) error {
 	-- Tabel achievement_attachments: menyimpan file lampiran prestasi
 	CREATE TABLE IF NOT EXISTS achievement_attachments (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-		achievement_id UUID NOT NULL,
+		achievement_id UUID NOT NULL REFERENCES achievement_references(id),
 		file_name VARCHAR(255) NOT NULL,
 		file_path VARCHAR(500) NOT NULL,
 		file_type VARCHAR(50),

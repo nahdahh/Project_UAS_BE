@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 
@@ -22,12 +23,27 @@ func main() {
 
 	cfg := config.LoadConfig()
 
+	log.Printf("📝 MongoDB Config - URI: %s, Database: %s", cfg.MongoDB.URI, cfg.MongoDB.Database)
+
 	// Initialize JWT secret
 	utils.InitJWT(cfg.JWT.Secret)
 
 	db := database.InitPostgres(cfg)
 	if err := database.InitSchema(db); err != nil {
 		log.Println("warning: failed to init schema:", err)
+	}
+
+	// Initialize MongoDB for achievements data
+	_, mongoDB, err := database.InitMongoDB(cfg)
+	if err != nil {
+		log.Fatal("❌ MongoDB connection failed:", err)
+	}
+
+	collections, err := mongoDB.ListCollectionNames(context.Background(), map[string]interface{}{})
+	if err != nil {
+		log.Println("⚠️  Warning: Failed to list collections:", err)
+	} else {
+		log.Printf("📦 Available collections in '%s': %v", cfg.MongoDB.Database, collections)
 	}
 
 	database.SetDB(db)
