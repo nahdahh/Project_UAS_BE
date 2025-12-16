@@ -1,0 +1,2529 @@
+basePath: /api/v1
+definitions:
+  model.APIResponse:
+    properties:
+      data: {}
+      message:
+        type: string
+      status:
+        description: '"success" atau "error"'
+        type: string
+    type: object
+  model.Achievement:
+    properties:
+      achievement_type:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      details:
+        additionalProperties: true
+        description: Dynamic fields
+        type: object
+      id:
+        type: string
+      points:
+        type: integer
+      student_id:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  model.AchievementAttachment:
+    properties:
+      achievement_id:
+        type: string
+      created_at:
+        type: string
+      file_name:
+        type: string
+      file_size:
+        type: integer
+      file_type:
+        type: string
+      file_url:
+        type: string
+      id:
+        type: string
+      uploaded_by:
+        type: string
+    type: object
+  model.AchievementHistory:
+    properties:
+      achievement_id:
+        type: string
+      changed_by:
+        type: string
+      changed_by_name:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      new_status:
+        type: string
+      note:
+        type: string
+      old_status:
+        type: string
+    type: object
+  model.AchievementWithReference:
+    properties:
+      achievement_type:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      details:
+        additionalProperties: true
+        description: Dynamic fields
+        type: object
+      id:
+        type: string
+      points:
+        type: integer
+      rejection_note:
+        type: string
+      status:
+        type: string
+      student_id:
+        type: string
+      submitted_at:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      updated_at:
+        type: string
+      verified_at:
+        type: string
+      verified_by:
+        type: string
+    type: object
+  model.CreateAchievementRequest:
+    properties:
+      achievement_type:
+        description: 'Tipe prestasi: academic, competition, organization, publication,
+          certification, other'
+        type: string
+      description:
+        description: Deskripsi prestasi
+        type: string
+      details:
+        additionalProperties: true
+        description: Detail dinamis berdasarkan tipe
+        type: object
+      points:
+        description: Poin prestasi
+        type: integer
+      tags:
+        description: Tag/kategori prestasi
+        items:
+          type: string
+        type: array
+      title:
+        description: Judul prestasi
+        type: string
+    type: object
+  model.CreateUserRequest:
+    properties:
+      email:
+        type: string
+      full_name:
+        type: string
+      password:
+        type: string
+      role_id:
+        type: string
+      username:
+        type: string
+    type: object
+  model.Lecturer:
+    properties:
+      created_at:
+        type: string
+      department:
+        description: Departemen/Jurusan
+        type: string
+      id:
+        type: string
+      lecturer_id:
+        description: NIDN atau identitas dosen
+        type: string
+      user_id:
+        description: Foreign key ke tabel users
+        type: string
+    type: object
+  model.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  model.Permission:
+    properties:
+      action:
+        description: Aksi yang diproteksi (create, read, update, delete, verify)
+        type: string
+      description:
+        description: Deskripsi permission
+        type: string
+      id:
+        type: string
+      name:
+        description: 'Nama permission (contoh: achievement:create)'
+        type: string
+      resource:
+        description: Resource yang diproteksi (achievement, user)
+        type: string
+    type: object
+  model.Role:
+    properties:
+      created_at:
+        type: string
+      description:
+        description: Deskripsi role
+        type: string
+      id:
+        type: string
+      name:
+        description: Nama role (Admin, Mahasiswa, Dosen Wali)
+        type: string
+    type: object
+  model.Student:
+    properties:
+      academic_year:
+        description: Tahun akademik
+        type: string
+      advisor_id:
+        description: Foreign key ke lecturer (dosen wali)
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      program_study:
+        description: Program studi
+        type: string
+      student_id:
+        description: NIM mahasiswa
+        type: string
+      user_id:
+        description: Foreign key ke tabel users
+        type: string
+    type: object
+  model.UpdateAchievementRequest:
+    properties:
+      achievement_type:
+        type: string
+      description:
+        type: string
+      details:
+        additionalProperties: true
+        type: object
+      points:
+        type: integer
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+    type: object
+  model.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        description: Email unik pengguna
+        type: string
+      full_name:
+        description: Nama lengkap pengguna
+        type: string
+      id:
+        type: string
+      is_active:
+        description: Status aktif pengguna
+        type: boolean
+      password_hash:
+        description: Hash password (tidak dikembalikan ke client)
+        type: string
+      role_id:
+        description: Foreign key ke tabel roles
+        type: string
+      updated_at:
+        type: string
+      username:
+        description: Username unik pengguna
+        type: string
+    type: object
+  model.UserProfile:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: string
+      permissions:
+        items:
+          type: string
+        type: array
+      role:
+        type: string
+      username:
+        type: string
+    type: object
+  model.UserWithRole:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      permissions:
+        items:
+          type: string
+        type: array
+      role:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:3000
+info:
+  contact: {}
+  description: |-
+    API untuk mengelola prestasi mahasiswa dengan fitur autentikasi, RBAC, dan pelaporan
+    Sistem ini mengelola data prestasi mahasiswa, dosen wali, dan admin dengan kontrol akses berbasis peran
+  title: UAS Backend API - Sistem Pelaporan Prestasi Mahasiswa
+  version: "1.0"
+paths:
+  /achievements:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil daftar semua prestasi dengan filter dan pagination
+      parameters:
+      - default: 1
+        description: Nomor halaman
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Jumlah data per halaman
+        in: query
+        name: page_size
+        type: integer
+      - description: Filter berdasarkan status
+        enum:
+        - draft
+        - submitted
+        - verified
+        - rejected
+        in: query
+        name: status
+        type: string
+      - description: Filter berdasarkan tipe
+        enum:
+        - academic
+        - competition
+        - organization
+        - publication
+        - certification
+        - other
+        in: query
+        name: achievement_type
+        type: string
+      - description: Filter berdasarkan student ID
+        in: query
+        name: student_id
+        type: string
+      - description: Filter tanggal mulai (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: Filter tanggal akhir (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      - default: created_at
+        description: Field untuk sorting
+        in: query
+        name: sort_by
+        type: string
+      - default: DESC
+        description: Urutan sorting
+        enum:
+        - ASC
+        - DESC
+        in: query
+        name: sort_order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Prestasi berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  properties:
+                    achievements:
+                      items:
+                        $ref: '#/definitions/model.AchievementWithReference'
+                      type: array
+                    filters:
+                      type: object
+                    pagination:
+                      type: object
+                  type: object
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan semua prestasi
+      tags:
+      - Achievements
+    post:
+      consumes:
+      - application/json
+      description: Membuat prestasi baru (hanya mahasiswa)
+      parameters:
+      - description: Data prestasi
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateAchievementRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Prestasi berhasil dibuat
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Achievement'
+              type: object
+        "400":
+          description: Format request tidak valid
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Student tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Buat prestasi baru
+      tags:
+      - Achievements
+  /achievements/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Menghapus prestasi (hanya yang berstatus draft)
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Prestasi berhasil dihapus
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "400":
+          description: Hanya prestasi draft yang bisa dihapus
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "401":
+          description: Prestasi bukan milik anda
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "403":
+          description: Dosen wali tidak dapat menghapus prestasi
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Prestasi tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Hapus prestasi
+      tags:
+      - Achievements
+    get:
+      consumes:
+      - application/json
+      description: Mengambil detail prestasi berdasarkan ID
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Detail prestasi berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.AchievementWithReference'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Prestasi tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan detail prestasi
+      tags:
+      - Achievements
+    put:
+      consumes:
+      - application/json
+      description: Memperbarui data prestasi (hanya yang berstatus draft)
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data prestasi yang diupdate
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.UpdateAchievementRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Prestasi berhasil diupdate
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Achievement'
+              type: object
+        "400":
+          description: Format request tidak valid atau status bukan draft
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "401":
+          description: Prestasi bukan milik anda
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "403":
+          description: Dosen wali tidak dapat mengedit prestasi
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Prestasi tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update prestasi
+      tags:
+      - Achievements
+  /achievements/{id}/attachments:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Mengupload file lampiran untuk prestasi
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: File lampiran
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Lampiran berhasil diupload
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.AchievementAttachment'
+              type: object
+        "400":
+          description: File harus diupload
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Achievement tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload lampiran prestasi
+      tags:
+      - Achievements
+  /achievements/{id}/history:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil riwayat perubahan status prestasi
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Riwayat berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.AchievementHistory'
+                  type: array
+              type: object
+        "400":
+          description: Achievement ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Achievement tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan riwayat prestasi
+      tags:
+      - Achievements
+  /achievements/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Menolak prestasi yang telah disubmit dengan catatan (dosen wali/admin)
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Catatan penolakan
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            rejection_note:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Prestasi berhasil ditolak
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.AchievementWithReference'
+              type: object
+        "400":
+          description: Format request tidak valid atau hanya prestasi submitted yang
+            bisa direject
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "401":
+          description: Anda bukan advisor dari student ini
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "403":
+          description: Mahasiswa tidak dapat menolak prestasi
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Prestasi tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Tolak prestasi
+      tags:
+      - Achievements
+  /achievements/{id}/submit:
+    post:
+      consumes:
+      - application/json
+      description: Mengubah status prestasi dari draft menjadi submitted
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Prestasi berhasil disubmit
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.AchievementWithReference'
+              type: object
+        "400":
+          description: Hanya prestasi draft yang bisa disubmit
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "401":
+          description: Prestasi bukan milik anda
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Prestasi tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Submit prestasi untuk verifikasi
+      tags:
+      - Achievements
+  /achievements/{id}/verify:
+    post:
+      consumes:
+      - application/json
+      description: Memverifikasi prestasi yang telah disubmit (dosen wali/admin)
+      parameters:
+      - description: Achievement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Prestasi berhasil diverifikasi
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.AchievementWithReference'
+              type: object
+        "400":
+          description: Hanya prestasi submitted yang bisa diverify
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "401":
+          description: Anda bukan advisor dari student ini
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "403":
+          description: Mahasiswa tidak dapat memverifikasi prestasi
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Prestasi tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Verifikasi prestasi
+      tags:
+      - Achievements
+  /achievements/advisee/list:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil daftar prestasi mahasiswa yang dibimbing (khusus dosen
+        wali)
+      parameters:
+      - default: 1
+        description: Nomor halaman
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Jumlah data per halaman
+        in: query
+        name: page_size
+        type: integer
+      - description: Filter berdasarkan status
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Prestasi anak bimbingan berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  properties:
+                    achievements:
+                      items:
+                        $ref: '#/definitions/model.AchievementWithReference'
+                      type: array
+                    pagination:
+                      type: object
+                  type: object
+              type: object
+        "403":
+          description: Mahasiswa tidak dapat mengakses endpoint ini
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan prestasi anak bimbingan
+      tags:
+      - Achievements
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Melakukan autentikasi pengguna dengan username dan password
+      parameters:
+      - description: Kredensial login
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login berhasil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  properties:
+                    permissions:
+                      items:
+                        type: string
+                      type: array
+                    refresh_token:
+                      type: string
+                    token:
+                      type: string
+                    user:
+                      type: object
+                  type: object
+              type: object
+        "400":
+          description: Format request tidak valid
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "401":
+          description: Username atau password salah
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "403":
+          description: User tidak aktif
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      summary: Login pengguna
+      tags:
+      - Authentication
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Melakukan logout pengguna (client harus menghapus token)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Logout berhasil
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout pengguna
+      tags:
+      - Authentication
+  /auth/profile:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil data profil pengguna yang sedang login
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Profil berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.UserProfile'
+              type: object
+        "401":
+          description: User tidak terautentikasi
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: User tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan profil pengguna
+      tags:
+      - Authentication
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Memperbarui access token menggunakan refresh token
+      parameters:
+      - description: Refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            refresh_token:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token berhasil di-refresh
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  properties:
+                    refresh_token:
+                      type: string
+                    token:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Format request tidak valid
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "401":
+          description: Refresh token tidak valid
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "403":
+          description: User tidak aktif
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      summary: Refresh access token
+      tags:
+      - Authentication
+  /lecturers:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil daftar semua dosen dengan pagination
+      parameters:
+      - default: 1
+        description: Nomor halaman
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Jumlah data per halaman
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar dosen berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  properties:
+                    lecturers:
+                      items:
+                        $ref: '#/definitions/model.Lecturer'
+                      type: array
+                    pagination:
+                      type: object
+                  type: object
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan semua dosen
+      tags:
+      - Lecturers
+    post:
+      consumes:
+      - application/json
+      description: Membuat data dosen baru dengan user ID yang valid
+      parameters:
+      - description: Data dosen
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            department:
+              type: string
+            lecturer_id:
+              type: string
+            user_id:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Dosen berhasil dibuat
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Lecturer'
+              type: object
+        "400":
+          description: Format request tidak valid
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Buat data dosen baru
+      tags:
+      - Lecturers
+  /lecturers/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Menghapus data dosen berdasarkan ID
+      parameters:
+      - description: Lecturer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Dosen berhasil dihapus
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "400":
+          description: ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Dosen tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Hapus data dosen
+      tags:
+      - Lecturers
+    get:
+      consumes:
+      - application/json
+      description: Mengambil data dosen berdasarkan ID
+      parameters:
+      - description: Lecturer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data dosen berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Lecturer'
+              type: object
+        "400":
+          description: ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Dosen tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan dosen berdasarkan ID
+      tags:
+      - Lecturers
+    put:
+      consumes:
+      - application/json
+      description: Memperbarui data dosen
+      parameters:
+      - description: Lecturer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data yang diupdate
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            department:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Dosen berhasil diupdate
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "400":
+          description: Format request tidak valid
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Dosen tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update data dosen
+      tags:
+      - Lecturers
+  /lecturers/{id}/advisees:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil daftar mahasiswa yang dibimbing oleh dosen
+      parameters:
+      - description: Lecturer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar anak bimbingan berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Student'
+                  type: array
+              type: object
+        "400":
+          description: Lecturer ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan anak bimbingan dosen
+      tags:
+      - Lecturers
+  /lecturers/user/{user_id}:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil data dosen berdasarkan User ID
+      parameters:
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data dosen berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Lecturer'
+              type: object
+        "400":
+          description: User ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Dosen tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan dosen berdasarkan User ID
+      tags:
+      - Lecturers
+  /permissions:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil daftar semua permission yang tersedia
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar permission berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Permission'
+                  type: array
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan semua permission
+      tags:
+      - Permissions
+    post:
+      consumes:
+      - application/json
+      description: Membuat permission baru untuk sistem RBAC
+      parameters:
+      - description: Data permission
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            action:
+              type: string
+            description:
+              type: string
+            name:
+              type: string
+            resource:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Permission berhasil dibuat
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Permission'
+              type: object
+        "400":
+          description: Format request tidak valid atau field wajib tidak diisi
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Buat permission baru
+      tags:
+      - Permissions
+  /permissions/role/{roleId}:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil daftar permission yang dimiliki oleh role tertentu
+      parameters:
+      - description: Role ID
+        in: path
+        name: roleId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar permission berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  items:
+                    type: string
+                  type: array
+              type: object
+        "400":
+          description: Role ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan permission berdasarkan role
+      tags:
+      - Permissions
+  /reports/statistics:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil statistik prestasi berdasarkan role user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Statistik berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan statistik prestasi
+      tags:
+      - Reports
+  /reports/statistics/period:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil statistik prestasi dalam rentang waktu tertentu
+      parameters:
+      - description: Tanggal mulai (YYYY-MM-DD)
+        in: query
+        name: start_date
+        required: true
+        type: string
+      - description: Tanggal akhir (YYYY-MM-DD)
+        in: query
+        name: end_date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Statistik berdasarkan periode berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Start date dan end date harus diisi atau format tidak valid
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan statistik berdasarkan periode
+      tags:
+      - Reports
+  /reports/statistics/type:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil statistik prestasi berdasarkan tipe prestasi
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Statistik berdasarkan tipe berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan statistik berdasarkan tipe
+      tags:
+      - Reports
+  /reports/student/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil laporan lengkap prestasi mahasiswa berdasarkan ID
+      parameters:
+      - description: Student ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Laporan berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Student ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "403":
+          description: Anda tidak memiliki akses ke report ini
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Mahasiswa tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan laporan mahasiswa
+      tags:
+      - Reports
+  /reports/top-students:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil daftar mahasiswa dengan poin prestasi tertinggi (hanya
+        admin)
+      parameters:
+      - default: 10
+        description: Jumlah mahasiswa yang ditampilkan
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Top students berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  properties:
+                    limit:
+                      type: integer
+                    top_students:
+                      items:
+                        type: object
+                      type: array
+                  type: object
+              type: object
+        "403":
+          description: Hanya admin yang dapat mengakses data ini
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan mahasiswa dengan prestasi terbaik
+      tags:
+      - Reports
+  /roles:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil daftar semua role yang tersedia
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar role berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Role'
+                  type: array
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan semua role
+      tags:
+      - Roles
+    post:
+      consumes:
+      - application/json
+      description: Membuat role baru untuk sistem RBAC
+      parameters:
+      - description: Data role
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            description:
+              type: string
+            name:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Role berhasil dibuat
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Role'
+              type: object
+        "400":
+          description: Format request tidak valid
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Buat role baru
+      tags:
+      - Roles
+  /roles/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil data role berdasarkan ID
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data role berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Role'
+              type: object
+        "400":
+          description: ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Role tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan role berdasarkan ID
+      tags:
+      - Roles
+    put:
+      consumes:
+      - application/json
+      description: Memperbarui deskripsi role
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Deskripsi baru
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            description:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Role berhasil diupdate
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Role'
+              type: object
+        "400":
+          description: Format request tidak valid
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Role tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update role
+      tags:
+      - Roles
+  /roles/assign-permission:
+    post:
+      consumes:
+      - application/json
+      description: Menambahkan permission ke role tertentu
+      parameters:
+      - description: Role ID dan Permission ID
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            permission_id:
+              type: string
+            role_id:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Permission berhasil ditambahkan ke role
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "400":
+          description: Format request tidak valid
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Role atau permission tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Assign permission ke role
+      tags:
+      - Roles
+  /roles/name/{name}:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil data role berdasarkan nama
+      parameters:
+      - description: Role Name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data role berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Role'
+              type: object
+        "400":
+          description: Name tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Role tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan role berdasarkan nama
+      tags:
+      - Roles
+  /roles/remove-permission:
+    post:
+      consumes:
+      - application/json
+      description: Menghapus permission dari role tertentu
+      parameters:
+      - description: Role ID dan Permission ID
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            permission_id:
+              type: string
+            role_id:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Permission berhasil dihapus dari role
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "400":
+          description: Format request tidak valid
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Role tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Hapus permission dari role
+      tags:
+      - Roles
+  /students:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil daftar semua mahasiswa dengan pagination
+      parameters:
+      - default: 1
+        description: Nomor halaman
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Jumlah data per halaman
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar mahasiswa berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  properties:
+                    pagination:
+                      type: object
+                    students:
+                      items:
+                        $ref: '#/definitions/model.Student'
+                      type: array
+                  type: object
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan semua mahasiswa
+      tags:
+      - Students
+    post:
+      consumes:
+      - application/json
+      description: Membuat data mahasiswa baru dengan user ID yang valid
+      parameters:
+      - description: Data mahasiswa
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            academic_year:
+              type: string
+            advisor_id:
+              type: string
+            program_study:
+              type: string
+            student_id:
+              type: string
+            user_id:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Mahasiswa berhasil dibuat
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Student'
+              type: object
+        "400":
+          description: Format request tidak valid
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Buat data mahasiswa baru
+      tags:
+      - Students
+  /students/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Menghapus data mahasiswa berdasarkan ID
+      parameters:
+      - description: Student ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Mahasiswa berhasil dihapus
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "400":
+          description: ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Mahasiswa tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Hapus data mahasiswa
+      tags:
+      - Students
+    get:
+      consumes:
+      - application/json
+      description: Mengambil data mahasiswa berdasarkan ID
+      parameters:
+      - description: Student ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data mahasiswa berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Student'
+              type: object
+        "400":
+          description: ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Mahasiswa tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan mahasiswa berdasarkan ID
+      tags:
+      - Students
+    put:
+      consumes:
+      - application/json
+      description: Memperbarui data mahasiswa
+      parameters:
+      - description: Student ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data yang diupdate
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            academic_year:
+              type: string
+            advisor_id:
+              type: string
+            program_study:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Mahasiswa berhasil diupdate
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "400":
+          description: Format request tidak valid
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Mahasiswa tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update data mahasiswa
+      tags:
+      - Students
+  /students/{id}/achievements:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil daftar prestasi mahasiswa berdasarkan ID
+      parameters:
+      - description: Student ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar prestasi berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.AchievementWithReference'
+                  type: array
+              type: object
+        "400":
+          description: ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Mahasiswa tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan prestasi mahasiswa
+      tags:
+      - Students
+  /students/{id}/advisor:
+    put:
+      consumes:
+      - application/json
+      description: Mengubah dosen wali mahasiswa
+      parameters:
+      - description: Student ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Advisor ID baru
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            advisor_id:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Dosen wali berhasil diupdate
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "400":
+          description: Student ID dan advisor ID harus diisi
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Mahasiswa tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update dosen wali mahasiswa
+      tags:
+      - Students
+  /students/advisor/{advisor_id}:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil daftar mahasiswa yang dibimbing oleh dosen wali tertentu
+      parameters:
+      - description: Advisor ID (Lecturer ID)
+        in: path
+        name: advisor_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar mahasiswa berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Student'
+                  type: array
+              type: object
+        "400":
+          description: Advisor ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan mahasiswa berdasarkan dosen wali
+      tags:
+      - Students
+  /students/user/{user_id}:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil data mahasiswa berdasarkan User ID
+      parameters:
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data mahasiswa berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Student'
+              type: object
+        "400":
+          description: User ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: Mahasiswa tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan mahasiswa berdasarkan User ID
+      tags:
+      - Students
+  /users:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil daftar semua user dengan pagination
+      parameters:
+      - default: 1
+        description: Nomor halaman
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Jumlah data per halaman
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar user berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  properties:
+                    pagination:
+                      type: object
+                    users:
+                      items:
+                        $ref: '#/definitions/model.User'
+                      type: array
+                  type: object
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan semua user
+      tags:
+      - Users
+    post:
+      consumes:
+      - application/json
+      description: Membuat user baru dengan role tertentu
+      parameters:
+      - description: Data user
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User berhasil dibuat
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.User'
+              type: object
+        "400":
+          description: Format request tidak valid atau username/email sudah terdaftar
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Buat user baru
+      tags:
+      - Users
+  /users/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Menghapus user berdasarkan ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User berhasil dihapus
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "400":
+          description: ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: User tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Hapus user
+      tags:
+      - Users
+    get:
+      consumes:
+      - application/json
+      description: Mengambil data user berdasarkan ID beserta permissions
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Data user berhasil diambil
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.UserWithRole'
+              type: object
+        "400":
+          description: ID tidak boleh kosong
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: User tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Dapatkan user berdasarkan ID
+      tags:
+      - Users
+    put:
+      consumes:
+      - application/json
+      description: Memperbarui data user (username, email, full_name)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data yang diupdate
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            email:
+              type: string
+            full_name:
+              type: string
+            username:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User berhasil diupdate
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.User'
+              type: object
+        "400":
+          description: Format request tidak valid
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: User tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update data user
+      tags:
+      - Users
+  /users/{id}/role:
+    put:
+      consumes:
+      - application/json
+      description: Mengubah role user
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Role ID baru
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            role_id:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Role berhasil diassign
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "400":
+          description: User ID dan role ID harus diisi
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "404":
+          description: User tidak ditemukan
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/model.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Assign role ke user
+      tags:
+      - Users
+schemes:
+- http
+- https
+securityDefinitions:
+  BearerAuth:
+    description: 'Masukkan token dengan format: Bearer {token}'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

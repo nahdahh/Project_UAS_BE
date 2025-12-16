@@ -34,6 +34,18 @@ func NewLecturerService(
 	}
 }
 
+// CreateLecturer godoc
+// @Summary Buat data dosen baru
+// @Description Membuat data dosen baru dengan user ID yang valid
+// @Tags Lecturers
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body object{user_id=string,lecturer_id=string,department=string} true "Data dosen"
+// @Success 201 {object} model.APIResponse{data=model.Lecturer} "Dosen berhasil dibuat"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /lecturers [post]
 func (s *lecturerServiceImpl) CreateLecturer(c *fiber.Ctx) error {
 	type CreateLecturerRequest struct {
 		UserID     string `json:"user_id"`
@@ -86,6 +98,19 @@ func (s *lecturerServiceImpl) CreateLecturer(c *fiber.Ctx) error {
 	})
 }
 
+// GetLecturerByID godoc
+// @Summary Dapatkan dosen berdasarkan ID
+// @Description Mengambil data dosen berdasarkan ID
+// @Tags Lecturers
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Lecturer ID"
+// @Success 200 {object} model.APIResponse{data=model.Lecturer} "Data dosen berhasil diambil"
+// @Failure 400 {object} model.APIResponse "ID tidak boleh kosong"
+// @Failure 404 {object} model.APIResponse "Dosen tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /lecturers/{id} [get]
 func (s *lecturerServiceImpl) GetLecturerByID(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -117,6 +142,19 @@ func (s *lecturerServiceImpl) GetLecturerByID(c *fiber.Ctx) error {
 	})
 }
 
+// GetLecturerByUserID godoc
+// @Summary Dapatkan dosen berdasarkan User ID
+// @Description Mengambil data dosen berdasarkan User ID
+// @Tags Lecturers
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param user_id path string true "User ID"
+// @Success 200 {object} model.APIResponse{data=model.Lecturer} "Data dosen berhasil diambil"
+// @Failure 400 {object} model.APIResponse "User ID tidak boleh kosong"
+// @Failure 404 {object} model.APIResponse "Dosen tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /lecturers/user/{user_id} [get]
 func (s *lecturerServiceImpl) GetLecturerByUserID(c *fiber.Ctx) error {
 	userID := c.Params("user_id")
 
@@ -148,6 +186,18 @@ func (s *lecturerServiceImpl) GetLecturerByUserID(c *fiber.Ctx) error {
 	})
 }
 
+// GetAllLecturers godoc
+// @Summary Dapatkan semua dosen
+// @Description Mengambil daftar semua dosen dengan pagination
+// @Tags Lecturers
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Nomor halaman" default(1)
+// @Param page_size query int false "Jumlah data per halaman" default(10)
+// @Success 200 {object} model.APIResponse{data=object{lecturers=[]model.Lecturer,pagination=object}} "Daftar dosen berhasil diambil"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /lecturers [get]
 func (s *lecturerServiceImpl) GetAllLecturers(c *fiber.Ctx) error {
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	pageSize, _ := strconv.Atoi(c.Query("page_size", "10"))
@@ -182,6 +232,18 @@ func (s *lecturerServiceImpl) GetAllLecturers(c *fiber.Ctx) error {
 	})
 }
 
+// GetAdvisees godoc
+// @Summary Dapatkan anak bimbingan dosen
+// @Description Mengambil daftar mahasiswa yang dibimbing oleh dosen
+// @Tags Lecturers
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Lecturer ID"
+// @Success 200 {object} model.APIResponse{data=[]model.Student} "Daftar anak bimbingan berhasil diambil"
+// @Failure 400 {object} model.APIResponse "Lecturer ID tidak boleh kosong"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /lecturers/{id}/advisees [get]
 func (s *lecturerServiceImpl) GetAdvisees(c *fiber.Ctx) error {
 	lecturerID := c.Params("id")
 
@@ -207,6 +269,20 @@ func (s *lecturerServiceImpl) GetAdvisees(c *fiber.Ctx) error {
 	})
 }
 
+// UpdateLecturer godoc
+// @Summary Update data dosen
+// @Description Memperbarui data dosen
+// @Tags Lecturers
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Lecturer ID"
+// @Param body body object{department=string} true "Data yang diupdate"
+// @Success 200 {object} model.APIResponse "Dosen berhasil diupdate"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid"
+// @Failure 404 {object} model.APIResponse "Dosen tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /lecturers/{id} [put]
 func (s *lecturerServiceImpl) UpdateLecturer(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -259,6 +335,19 @@ func (s *lecturerServiceImpl) UpdateLecturer(c *fiber.Ctx) error {
 	})
 }
 
+// DeleteLecturer godoc
+// @Summary Hapus data dosen
+// @Description Menghapus data dosen berdasarkan ID
+// @Tags Lecturers
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Lecturer ID"
+// @Success 200 {object} model.APIResponse "Dosen berhasil dihapus"
+// @Failure 400 {object} model.APIResponse "ID tidak boleh kosong"
+// @Failure 404 {object} model.APIResponse "Dosen tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /lecturers/{id} [delete]
 func (s *lecturerServiceImpl) DeleteLecturer(c *fiber.Ctx) error {
 	id := c.Params("id")
 

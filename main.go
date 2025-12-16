@@ -9,12 +9,27 @@ import (
 	"uas_be/app/repository"
 	"uas_be/config"
 	"uas_be/database"
+	_ "uas_be/docs"
 	"uas_be/route"
 	"uas_be/utils"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
+	fiberSwagger "github.com/swaggo/fiber-swagger"
 )
+
+// @title UAS Backend API - Sistem Pelaporan Prestasi Mahasiswa
+// @version 1.0
+// @description API untuk mengelola prestasi mahasiswa dengan fitur autentikasi, RBAC, dan pelaporan
+// @description Sistem ini mengelola data prestasi mahasiswa, dosen wali, dan admin dengan kontrol akses berbasis peran
+// @host localhost:3000
+// @BasePath /api/v1
+// @schemes http https
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Masukkan token dengan format: Bearer {token}
 
 func main() {
 	if err := godotenv.Load(); err != nil {
@@ -54,9 +69,12 @@ func main() {
 	// ===== FIBER APP =====
 	app := fiber.New()
 
+	app.Get("/swagger/*", fiberSwagger.WrapHandler)
+
 	route.RegisterRoutes(app)
 
 	log.Println("🚀 Server running at http://localhost:3000")
+	log.Println("📚 Swagger documentation available at http://localhost:3000/swagger/index.html")
 	if err := app.Listen(":3000"); err != nil {
 		log.Fatal(err)
 	}

@@ -34,6 +34,18 @@ func NewStudentService(studentRepo repository.StudentRepository, achievementRepo
 	}
 }
 
+// CreateStudent godoc
+// @Summary Buat data mahasiswa baru
+// @Description Membuat data mahasiswa baru dengan user ID yang valid
+// @Tags Students
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body object{user_id=string,student_id=string,program_study=string,academic_year=string,advisor_id=string} true "Data mahasiswa"
+// @Success 201 {object} model.APIResponse{data=model.Student} "Mahasiswa berhasil dibuat"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /students [post]
 func (s *studentServiceImpl) CreateStudent(c *fiber.Ctx) error {
 	type CreateStudentRequest struct {
 		UserID       string `json:"user_id"`
@@ -111,6 +123,19 @@ func (s *studentServiceImpl) CreateStudent(c *fiber.Ctx) error {
 	})
 }
 
+// GetStudentByID godoc
+// @Summary Dapatkan mahasiswa berdasarkan ID
+// @Description Mengambil data mahasiswa berdasarkan ID
+// @Tags Students
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Student ID"
+// @Success 200 {object} model.APIResponse{data=model.Student} "Data mahasiswa berhasil diambil"
+// @Failure 400 {object} model.APIResponse "ID tidak boleh kosong"
+// @Failure 404 {object} model.APIResponse "Mahasiswa tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /students/{id} [get]
 func (s *studentServiceImpl) GetStudentByID(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -143,6 +168,19 @@ func (s *studentServiceImpl) GetStudentByID(c *fiber.Ctx) error {
 	})
 }
 
+// GetStudentByUserID godoc
+// @Summary Dapatkan mahasiswa berdasarkan User ID
+// @Description Mengambil data mahasiswa berdasarkan User ID
+// @Tags Students
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param user_id path string true "User ID"
+// @Success 200 {object} model.APIResponse{data=model.Student} "Data mahasiswa berhasil diambil"
+// @Failure 400 {object} model.APIResponse "User ID tidak boleh kosong"
+// @Failure 404 {object} model.APIResponse "Mahasiswa tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /students/user/{user_id} [get]
 func (s *studentServiceImpl) GetStudentByUserID(c *fiber.Ctx) error {
 	userID := c.Params("user_id")
 
@@ -175,6 +213,18 @@ func (s *studentServiceImpl) GetStudentByUserID(c *fiber.Ctx) error {
 	})
 }
 
+// GetAllStudents godoc
+// @Summary Dapatkan semua mahasiswa
+// @Description Mengambil daftar semua mahasiswa dengan pagination
+// @Tags Students
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Nomor halaman" default(1)
+// @Param page_size query int false "Jumlah data per halaman" default(10)
+// @Success 200 {object} model.APIResponse{data=object{students=[]model.Student,pagination=object}} "Daftar mahasiswa berhasil diambil"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /students [get]
 func (s *studentServiceImpl) GetAllStudents(c *fiber.Ctx) error {
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	pageSize, _ := strconv.Atoi(c.Query("page_size", "10"))
@@ -210,6 +260,18 @@ func (s *studentServiceImpl) GetAllStudents(c *fiber.Ctx) error {
 	})
 }
 
+// GetStudentsByAdvisor godoc
+// @Summary Dapatkan mahasiswa berdasarkan dosen wali
+// @Description Mengambil daftar mahasiswa yang dibimbing oleh dosen wali tertentu
+// @Tags Students
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param advisor_id path string true "Advisor ID (Lecturer ID)"
+// @Success 200 {object} model.APIResponse{data=[]model.Student} "Daftar mahasiswa berhasil diambil"
+// @Failure 400 {object} model.APIResponse "Advisor ID tidak boleh kosong"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /students/advisor/{advisor_id} [get]
 func (s *studentServiceImpl) GetStudentsByAdvisor(c *fiber.Ctx) error {
 	advisorID := c.Params("advisor_id")
 
@@ -236,6 +298,20 @@ func (s *studentServiceImpl) GetStudentsByAdvisor(c *fiber.Ctx) error {
 	})
 }
 
+// UpdateStudent godoc
+// @Summary Update data mahasiswa
+// @Description Memperbarui data mahasiswa
+// @Tags Students
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Student ID"
+// @Param body body object{program_study=string,academic_year=string,advisor_id=string} true "Data yang diupdate"
+// @Success 200 {object} model.APIResponse "Mahasiswa berhasil diupdate"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid"
+// @Failure 404 {object} model.APIResponse "Mahasiswa tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /students/{id} [put]
 func (s *studentServiceImpl) UpdateStudent(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -308,6 +384,19 @@ func (s *studentServiceImpl) UpdateStudent(c *fiber.Ctx) error {
 	})
 }
 
+// DeleteStudent godoc
+// @Summary Hapus data mahasiswa
+// @Description Menghapus data mahasiswa berdasarkan ID
+// @Tags Students
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Student ID"
+// @Success 200 {object} model.APIResponse "Mahasiswa berhasil dihapus"
+// @Failure 400 {object} model.APIResponse "ID tidak boleh kosong"
+// @Failure 404 {object} model.APIResponse "Mahasiswa tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /students/{id} [delete]
 func (s *studentServiceImpl) DeleteStudent(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -346,6 +435,19 @@ func (s *studentServiceImpl) DeleteStudent(c *fiber.Ctx) error {
 	})
 }
 
+// GetStudentAchievements godoc
+// @Summary Dapatkan prestasi mahasiswa
+// @Description Mengambil daftar prestasi mahasiswa berdasarkan ID
+// @Tags Students
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Student ID"
+// @Success 200 {object} model.APIResponse{data=[]model.AchievementWithReference} "Daftar prestasi berhasil diambil"
+// @Failure 400 {object} model.APIResponse "ID tidak boleh kosong"
+// @Failure 404 {object} model.APIResponse "Mahasiswa tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /students/{id}/achievements [get]
 func (s *studentServiceImpl) GetStudentAchievements(c *fiber.Ctx) error {
 	studentID := c.Params("id")
 
@@ -385,6 +487,20 @@ func (s *studentServiceImpl) GetStudentAchievements(c *fiber.Ctx) error {
 	})
 }
 
+// UpdateAdvisor godoc
+// @Summary Update dosen wali mahasiswa
+// @Description Mengubah dosen wali mahasiswa
+// @Tags Students
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Student ID"
+// @Param body body object{advisor_id=string} true "Advisor ID baru"
+// @Success 200 {object} model.APIResponse "Dosen wali berhasil diupdate"
+// @Failure 400 {object} model.APIResponse "Student ID dan advisor ID harus diisi"
+// @Failure 404 {object} model.APIResponse "Mahasiswa tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /students/{id}/advisor [put]
 func (s *studentServiceImpl) UpdateAdvisor(c *fiber.Ctx) error {
 	studentID := c.Params("id")
 

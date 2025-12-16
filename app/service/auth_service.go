@@ -33,6 +33,19 @@ func NewAuthService(
 	}
 }
 
+// Login godoc
+// @Summary Login pengguna
+// @Description Melakukan autentikasi pengguna dengan username dan password
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param body body model.LoginRequest true "Kredensial login"
+// @Success 200 {object} model.APIResponse{data=object{token=string,refresh_token=string,user=object,permissions=[]string}} "Login berhasil"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid"
+// @Failure 401 {object} model.APIResponse "Username atau password salah"
+// @Failure 403 {object} model.APIResponse "User tidak aktif"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /auth/login [post]
 func (s *authServiceImpl) Login(c *fiber.Ctx) error {
 	type LoginRequest struct {
 		Username string `json:"username"`
@@ -94,6 +107,18 @@ func (s *authServiceImpl) Login(c *fiber.Ctx) error {
 	})
 }
 
+// GetProfile godoc
+// @Summary Dapatkan profil pengguna
+// @Description Mengambil data profil pengguna yang sedang login
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} model.APIResponse{data=model.UserProfile} "Profil berhasil diambil"
+// @Failure 401 {object} model.APIResponse "User tidak terautentikasi"
+// @Failure 404 {object} model.APIResponse "User tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /auth/profile [get]
 func (s *authServiceImpl) GetProfile(c *fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(string)
 	if !ok {
@@ -130,6 +155,19 @@ func (s *authServiceImpl) GetProfile(c *fiber.Ctx) error {
 	})
 }
 
+// RefreshToken godoc
+// @Summary Refresh access token
+// @Description Memperbarui access token menggunakan refresh token
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param body body object{refresh_token=string} true "Refresh token"
+// @Success 200 {object} model.APIResponse{data=object{token=string,refresh_token=string}} "Token berhasil di-refresh"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid"
+// @Failure 401 {object} model.APIResponse "Refresh token tidak valid"
+// @Failure 403 {object} model.APIResponse "User tidak aktif"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /auth/refresh [post]
 func (s *authServiceImpl) RefreshToken(c *fiber.Ctx) error {
 	type RefreshRequest struct {
 		RefreshToken string `json:"refresh_token"`
@@ -186,6 +224,15 @@ func (s *authServiceImpl) RefreshToken(c *fiber.Ctx) error {
 	})
 }
 
+// Logout godoc
+// @Summary Logout pengguna
+// @Description Melakukan logout pengguna (client harus menghapus token)
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} model.APIResponse "Logout berhasil"
+// @Router /auth/logout [post]
 func (s *authServiceImpl) Logout(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
 		Status:  "success",

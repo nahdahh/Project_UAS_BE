@@ -33,6 +33,16 @@ func NewReportService(
 	}
 }
 
+// GetStatistics godoc
+// @Summary Dapatkan statistik prestasi
+// @Description Mengambil statistik prestasi berdasarkan role user
+// @Tags Reports
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} model.APIResponse{data=object} "Statistik berhasil diambil"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /reports/statistics [get]
 func (s *reportServiceImpl) GetStatistics(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(string)
 	role := c.Locals("role").(string)
@@ -94,6 +104,20 @@ func (s *reportServiceImpl) GetStatistics(c *fiber.Ctx) error {
 	})
 }
 
+// GetStudentReport godoc
+// @Summary Dapatkan laporan mahasiswa
+// @Description Mengambil laporan lengkap prestasi mahasiswa berdasarkan ID
+// @Tags Reports
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Student ID"
+// @Success 200 {object} model.APIResponse{data=object} "Laporan berhasil diambil"
+// @Failure 400 {object} model.APIResponse "Student ID tidak boleh kosong"
+// @Failure 403 {object} model.APIResponse "Anda tidak memiliki akses ke report ini"
+// @Failure 404 {object} model.APIResponse "Mahasiswa tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /reports/student/{id} [get]
 func (s *reportServiceImpl) GetStudentReport(c *fiber.Ctx) error {
 	studentID := c.Params("id")
 	userID := c.Locals("userID").(string)
@@ -153,6 +177,19 @@ func (s *reportServiceImpl) GetStudentReport(c *fiber.Ctx) error {
 	})
 }
 
+// GetStatisticsByPeriod godoc
+// @Summary Dapatkan statistik berdasarkan periode
+// @Description Mengambil statistik prestasi dalam rentang waktu tertentu
+// @Tags Reports
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param start_date query string true "Tanggal mulai (YYYY-MM-DD)"
+// @Param end_date query string true "Tanggal akhir (YYYY-MM-DD)"
+// @Success 200 {object} model.APIResponse{data=object} "Statistik berdasarkan periode berhasil diambil"
+// @Failure 400 {object} model.APIResponse "Start date dan end date harus diisi atau format tidak valid"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /reports/statistics/period [get]
 func (s *reportServiceImpl) GetStatisticsByPeriod(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(string)
 	role := c.Locals("role").(string)
@@ -186,6 +223,16 @@ func (s *reportServiceImpl) GetStatisticsByPeriod(c *fiber.Ctx) error {
 	})
 }
 
+// GetStatisticsByType godoc
+// @Summary Dapatkan statistik berdasarkan tipe
+// @Description Mengambil statistik prestasi berdasarkan tipe prestasi
+// @Tags Reports
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} model.APIResponse{data=object} "Statistik berdasarkan tipe berhasil diambil"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /reports/statistics/type [get]
 func (s *reportServiceImpl) GetStatisticsByType(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(string)
 	role := c.Locals("role").(string)
@@ -202,6 +249,18 @@ func (s *reportServiceImpl) GetStatisticsByType(c *fiber.Ctx) error {
 	})
 }
 
+// GetTopStudents godoc
+// @Summary Dapatkan mahasiswa dengan prestasi terbaik
+// @Description Mengambil daftar mahasiswa dengan poin prestasi tertinggi (hanya admin)
+// @Tags Reports
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param limit query int false "Jumlah mahasiswa yang ditampilkan" default(10)
+// @Success 200 {object} model.APIResponse{data=object{top_students=[]object,limit=int}} "Top students berhasil diambil"
+// @Failure 403 {object} model.APIResponse "Hanya admin yang dapat mengakses data ini"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /reports/top-students [get]
 func (s *reportServiceImpl) GetTopStudents(c *fiber.Ctx) error {
 	role := c.Locals("role").(string)
 

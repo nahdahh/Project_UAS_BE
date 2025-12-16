@@ -39,6 +39,25 @@ func NewAchievementService(
 	}
 }
 
+// GetAllAchievements godoc
+// @Summary Dapatkan semua prestasi
+// @Description Mengambil daftar semua prestasi dengan filter dan pagination
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Nomor halaman" default(1)
+// @Param page_size query int false "Jumlah data per halaman" default(10)
+// @Param status query string false "Filter berdasarkan status" Enums(draft, submitted, verified, rejected)
+// @Param achievement_type query string false "Filter berdasarkan tipe" Enums(academic, competition, organization, publication, certification, other)
+// @Param student_id query string false "Filter berdasarkan student ID"
+// @Param start_date query string false "Filter tanggal mulai (YYYY-MM-DD)"
+// @Param end_date query string false "Filter tanggal akhir (YYYY-MM-DD)"
+// @Param sort_by query string false "Field untuk sorting" default(created_at)
+// @Param sort_order query string false "Urutan sorting" Enums(ASC, DESC) default(DESC)
+// @Success 200 {object} model.APIResponse{data=object{achievements=[]model.AchievementWithReference,filters=object,pagination=object}} "Prestasi berhasil diambil"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /achievements [get]
 func (s *achievementServiceImpl) GetAllAchievements(c *fiber.Ctx) error {
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	pageSize, _ := strconv.Atoi(c.Query("page_size", "10"))
@@ -117,6 +136,19 @@ func (s *achievementServiceImpl) GetAllAchievements(c *fiber.Ctx) error {
 	})
 }
 
+// GetAchievementDetail godoc
+// @Summary Dapatkan detail prestasi
+// @Description Mengambil detail prestasi berdasarkan ID
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Achievement ID"
+// @Success 200 {object} model.APIResponse{data=model.AchievementWithReference} "Detail prestasi berhasil diambil"
+// @Failure 401 {object} model.APIResponse "Unauthorized"
+// @Failure 404 {object} model.APIResponse "Prestasi tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /achievements/{id} [get]
 func (s *achievementServiceImpl) GetAchievementDetail(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
 	studentID := c.Locals("userID").(string)
@@ -167,6 +199,19 @@ func (s *achievementServiceImpl) GetAchievementDetail(c *fiber.Ctx) error {
 	})
 }
 
+// CreateAchievement godoc
+// @Summary Buat prestasi baru
+// @Description Membuat prestasi baru (hanya mahasiswa)
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body model.CreateAchievementRequest true "Data prestasi"
+// @Success 201 {object} model.APIResponse{data=model.Achievement} "Prestasi berhasil dibuat"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid"
+// @Failure 404 {object} model.APIResponse "Student tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /achievements [post]
 func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 	studentID := c.Locals("userID").(string)
 
@@ -212,6 +257,22 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 	})
 }
 
+// UpdateAchievement godoc
+// @Summary Update prestasi
+// @Description Memperbarui data prestasi (hanya yang berstatus draft)
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Achievement ID"
+// @Param body body model.UpdateAchievementRequest true "Data prestasi yang diupdate"
+// @Success 200 {object} model.APIResponse{data=model.Achievement} "Prestasi berhasil diupdate"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid atau status bukan draft"
+// @Failure 401 {object} model.APIResponse "Prestasi bukan milik anda"
+// @Failure 403 {object} model.APIResponse "Dosen wali tidak dapat mengedit prestasi"
+// @Failure 404 {object} model.APIResponse "Prestasi tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /achievements/{id} [put]
 func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
 	studentID := c.Locals("userID").(string)
@@ -290,6 +351,20 @@ func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 	})
 }
 
+// SubmitAchievement godoc
+// @Summary Submit prestasi untuk verifikasi
+// @Description Mengubah status prestasi dari draft menjadi submitted
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Achievement ID"
+// @Success 200 {object} model.APIResponse{data=model.AchievementWithReference} "Prestasi berhasil disubmit"
+// @Failure 400 {object} model.APIResponse "Hanya prestasi draft yang bisa disubmit"
+// @Failure 401 {object} model.APIResponse "Prestasi bukan milik anda"
+// @Failure 404 {object} model.APIResponse "Prestasi tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /achievements/{id}/submit [post]
 func (s *achievementServiceImpl) SubmitAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
 	studentID := c.Locals("userID").(string)
@@ -332,6 +407,21 @@ func (s *achievementServiceImpl) SubmitAchievement(c *fiber.Ctx) error {
 	})
 }
 
+// VerifyAchievement godoc
+// @Summary Verifikasi prestasi
+// @Description Memverifikasi prestasi yang telah disubmit (dosen wali/admin)
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Achievement ID"
+// @Success 200 {object} model.APIResponse{data=model.AchievementWithReference} "Prestasi berhasil diverifikasi"
+// @Failure 400 {object} model.APIResponse "Hanya prestasi submitted yang bisa diverify"
+// @Failure 401 {object} model.APIResponse "Anda bukan advisor dari student ini"
+// @Failure 403 {object} model.APIResponse "Mahasiswa tidak dapat memverifikasi prestasi"
+// @Failure 404 {object} model.APIResponse "Prestasi tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /achievements/{id}/verify [post]
 func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
 	verifiedBy := c.Locals("userID").(string)
@@ -392,6 +482,22 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 	})
 }
 
+// RejectAchievement godoc
+// @Summary Tolak prestasi
+// @Description Menolak prestasi yang telah disubmit dengan catatan (dosen wali/admin)
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Achievement ID"
+// @Param body body object{rejection_note=string} true "Catatan penolakan"
+// @Success 200 {object} model.APIResponse{data=model.AchievementWithReference} "Prestasi berhasil ditolak"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid atau hanya prestasi submitted yang bisa direject"
+// @Failure 401 {object} model.APIResponse "Anda bukan advisor dari student ini"
+// @Failure 403 {object} model.APIResponse "Mahasiswa tidak dapat menolak prestasi"
+// @Failure 404 {object} model.APIResponse "Prestasi tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /achievements/{id}/reject [post]
 func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
 	rejectedBy := c.Locals("userID").(string)
@@ -464,6 +570,21 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 	})
 }
 
+// DeleteAchievement godoc
+// @Summary Hapus prestasi
+// @Description Menghapus prestasi (hanya yang berstatus draft)
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Achievement ID"
+// @Success 200 {object} model.APIResponse "Prestasi berhasil dihapus"
+// @Failure 400 {object} model.APIResponse "Hanya prestasi draft yang bisa dihapus"
+// @Failure 401 {object} model.APIResponse "Prestasi bukan milik anda"
+// @Failure 403 {object} model.APIResponse "Dosen wali tidak dapat menghapus prestasi"
+// @Failure 404 {object} model.APIResponse "Prestasi tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /achievements/{id} [delete]
 func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
 	studentID := c.Locals("userID").(string)
@@ -517,6 +638,20 @@ func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
 	})
 }
 
+// GetAdviseeAchievements godoc
+// @Summary Dapatkan prestasi anak bimbingan
+// @Description Mengambil daftar prestasi mahasiswa yang dibimbing (khusus dosen wali)
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Nomor halaman" default(1)
+// @Param page_size query int false "Jumlah data per halaman" default(10)
+// @Param status query string false "Filter berdasarkan status"
+// @Success 200 {object} model.APIResponse{data=object{achievements=[]model.AchievementWithReference,pagination=object}} "Prestasi anak bimbingan berhasil diambil"
+// @Failure 403 {object} model.APIResponse "Mahasiswa tidak dapat mengakses endpoint ini"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /achievements/advisee/list [get]
 func (s *achievementServiceImpl) GetAdviseeAchievements(c *fiber.Ctx) error {
 	advisorID := c.Locals("userID").(string)
 	role := c.Locals("role").(string)
@@ -615,6 +750,20 @@ func (s *achievementServiceImpl) GetAdviseeAchievements(c *fiber.Ctx) error {
 	})
 }
 
+// GetAchievementHistory godoc
+// @Summary Dapatkan riwayat prestasi
+// @Description Mengambil riwayat perubahan status prestasi
+// @Tags Achievements
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Achievement ID"
+// @Success 200 {object} model.APIResponse{data=[]model.AchievementHistory} "Riwayat berhasil diambil"
+// @Failure 400 {object} model.APIResponse "Achievement ID tidak boleh kosong"
+// @Failure 401 {object} model.APIResponse "Unauthorized"
+// @Failure 404 {object} model.APIResponse "Achievement tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /achievements/{id}/history [get]
 func (s *achievementServiceImpl) GetAchievementHistory(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
 	userID := c.Locals("userID").(string)
@@ -663,6 +812,21 @@ func (s *achievementServiceImpl) GetAchievementHistory(c *fiber.Ctx) error {
 	})
 }
 
+// UploadAttachment godoc
+// @Summary Upload lampiran prestasi
+// @Description Mengupload file lampiran untuk prestasi
+// @Tags Achievements
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Achievement ID"
+// @Param file formData file true "File lampiran"
+// @Success 201 {object} model.APIResponse{data=model.AchievementAttachment} "Lampiran berhasil diupload"
+// @Failure 400 {object} model.APIResponse "File harus diupload"
+// @Failure 401 {object} model.APIResponse "Unauthorized"
+// @Failure 404 {object} model.APIResponse "Achievement tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /achievements/{id}/attachments [post]
 func (s *achievementServiceImpl) UploadAttachment(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
 	userID := c.Locals("userID").(string)

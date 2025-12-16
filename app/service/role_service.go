@@ -38,6 +38,18 @@ func NewRoleService(
 	}
 }
 
+// CreateRole godoc
+// @Summary Buat role baru
+// @Description Membuat role baru untuk sistem RBAC
+// @Tags Roles
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body object{name=string,description=string} true "Data role"
+// @Success 201 {object} model.APIResponse{data=model.Role} "Role berhasil dibuat"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /roles [post]
 func (s *roleServiceImpl) CreateRole(c *fiber.Ctx) error {
 	type CreateRoleRequest struct {
 		Name        string `json:"name"`
@@ -57,6 +69,19 @@ func (s *roleServiceImpl) CreateRole(c *fiber.Ctx) error {
 	return helper.SuccessResponse(c, fiber.StatusCreated, "role berhasil dibuat", role)
 }
 
+// GetRoleByID godoc
+// @Summary Dapatkan role berdasarkan ID
+// @Description Mengambil data role berdasarkan ID
+// @Tags Roles
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Role ID"
+// @Success 200 {object} model.APIResponse{data=model.Role} "Data role berhasil diambil"
+// @Failure 400 {object} model.APIResponse "ID tidak boleh kosong"
+// @Failure 404 {object} model.APIResponse "Role tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /roles/{id} [get]
 func (s *roleServiceImpl) GetRoleByID(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -71,6 +96,19 @@ func (s *roleServiceImpl) GetRoleByID(c *fiber.Ctx) error {
 	return helper.SuccessResponse(c, fiber.StatusOK, "role berhasil diambil", role)
 }
 
+// GetRoleByName godoc
+// @Summary Dapatkan role berdasarkan nama
+// @Description Mengambil data role berdasarkan nama
+// @Tags Roles
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param name path string true "Role Name"
+// @Success 200 {object} model.APIResponse{data=model.Role} "Data role berhasil diambil"
+// @Failure 400 {object} model.APIResponse "Name tidak boleh kosong"
+// @Failure 404 {object} model.APIResponse "Role tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /roles/name/{name} [get]
 func (s *roleServiceImpl) GetRoleByName(c *fiber.Ctx) error {
 	name := c.Params("name")
 
@@ -85,6 +123,16 @@ func (s *roleServiceImpl) GetRoleByName(c *fiber.Ctx) error {
 	return helper.SuccessResponse(c, fiber.StatusOK, "role berhasil diambil", role)
 }
 
+// GetAllRoles godoc
+// @Summary Dapatkan semua role
+// @Description Mengambil daftar semua role yang tersedia
+// @Tags Roles
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} model.APIResponse{data=[]model.Role} "Daftar role berhasil diambil"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /roles [get]
 func (s *roleServiceImpl) GetAllRoles(c *fiber.Ctx) error {
 	roles, err := s.getAllRoles()
 	if err != nil {
@@ -94,6 +142,20 @@ func (s *roleServiceImpl) GetAllRoles(c *fiber.Ctx) error {
 	return helper.SuccessResponse(c, fiber.StatusOK, "roles berhasil diambil", roles)
 }
 
+// UpdateRole godoc
+// @Summary Update role
+// @Description Memperbarui deskripsi role
+// @Tags Roles
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Role ID"
+// @Param body body object{description=string} true "Deskripsi baru"
+// @Success 200 {object} model.APIResponse{data=model.Role} "Role berhasil diupdate"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid"
+// @Failure 404 {object} model.APIResponse "Role tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /roles/{id} [put]
 func (s *roleServiceImpl) UpdateRole(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -114,6 +176,19 @@ func (s *roleServiceImpl) UpdateRole(c *fiber.Ctx) error {
 	return helper.SuccessResponse(c, fiber.StatusOK, "role berhasil diupdate", role)
 }
 
+// AssignPermission godoc
+// @Summary Assign permission ke role
+// @Description Menambahkan permission ke role tertentu
+// @Tags Roles
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body object{role_id=string,permission_id=string} true "Role ID dan Permission ID"
+// @Success 200 {object} model.APIResponse "Permission berhasil ditambahkan ke role"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid"
+// @Failure 404 {object} model.APIResponse "Role atau permission tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /roles/assign-permission [post]
 func (s *roleServiceImpl) AssignPermission(c *fiber.Ctx) error {
 	type AssignPermissionRequest struct {
 		RoleID       string `json:"role_id"`
@@ -133,6 +208,19 @@ func (s *roleServiceImpl) AssignPermission(c *fiber.Ctx) error {
 	return helper.SuccessResponse(c, fiber.StatusOK, "permission berhasil ditambahkan ke role", nil)
 }
 
+// RemovePermission godoc
+// @Summary Hapus permission dari role
+// @Description Menghapus permission dari role tertentu
+// @Tags Roles
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body object{role_id=string,permission_id=string} true "Role ID dan Permission ID"
+// @Success 200 {object} model.APIResponse "Permission berhasil dihapus dari role"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid"
+// @Failure 404 {object} model.APIResponse "Role tidak ditemukan"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /roles/remove-permission [post]
 func (s *roleServiceImpl) RemovePermission(c *fiber.Ctx) error {
 	type RemovePermissionRequest struct {
 		RoleID       string `json:"role_id"`

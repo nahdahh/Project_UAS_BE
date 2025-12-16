@@ -25,6 +25,16 @@ func NewPermissionService(permissionRepo repository.PermissionRepository) Permis
 	}
 }
 
+// GetAllPermissions godoc
+// @Summary Dapatkan semua permission
+// @Description Mengambil daftar semua permission yang tersedia
+// @Tags Permissions
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} model.APIResponse{data=[]model.Permission} "Daftar permission berhasil diambil"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /permissions [get]
 func (s *permissionServiceImpl) GetAllPermissions(c *fiber.Ctx) error {
 	permissions, err := s.permissionRepo.GetAllPermissions()
 	if err != nil {
@@ -38,6 +48,18 @@ func (s *permissionServiceImpl) GetAllPermissions(c *fiber.Ctx) error {
 	})
 }
 
+// CreatePermission godoc
+// @Summary Buat permission baru
+// @Description Membuat permission baru untuk sistem RBAC
+// @Tags Permissions
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body object{name=string,resource=string,action=string,description=string} true "Data permission"
+// @Success 201 {object} model.APIResponse{data=model.Permission} "Permission berhasil dibuat"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid atau field wajib tidak diisi"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /permissions [post]
 func (s *permissionServiceImpl) CreatePermission(c *fiber.Ctx) error {
 	type CreatePermissionRequest struct {
 		Name        string `json:"name"`
@@ -74,6 +96,18 @@ func (s *permissionServiceImpl) CreatePermission(c *fiber.Ctx) error {
 	})
 }
 
+// GetPermissionsByRoleID godoc
+// @Summary Dapatkan permission berdasarkan role
+// @Description Mengambil daftar permission yang dimiliki oleh role tertentu
+// @Tags Permissions
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param roleId path string true "Role ID"
+// @Success 200 {object} model.APIResponse{data=[]string} "Daftar permission berhasil diambil"
+// @Failure 400 {object} model.APIResponse "Role ID tidak boleh kosong"
+// @Failure 500 {object} model.APIResponse "Internal server error"
+// @Router /permissions/role/{roleId} [get]
 func (s *permissionServiceImpl) GetPermissionsByRoleID(c *fiber.Ctx) error {
 	roleID := c.Params("roleId")
 
