@@ -1,8 +1,11 @@
 package service
 
 import (
+	"strconv"
+	"time"
 	"uas_be/app/model"
 	"uas_be/app/repository"
+	"uas_be/helper"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -10,6 +13,9 @@ import (
 type ReportService interface {
 	GetStatistics(c *fiber.Ctx) error
 	GetStudentReport(c *fiber.Ctx) error
+	GetStatisticsByPeriod(c *fiber.Ctx) error
+	GetStatisticsByType(c *fiber.Ctx) error
+	GetTopStudents(c *fiber.Ctx) error
 }
 
 type reportServiceImpl struct {
@@ -28,20 +34,38 @@ func NewReportService(
 }
 
 func (s *reportServiceImpl) GetStatistics(c *fiber.Ctx) error {
-	// Get all achievements
-	achievements, _, err := s.achievementRepo.GetAllAchievements(1, 10000)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
-			Status:  "error",
-			Message: "gagal mengambil data achievements",
-		})
+	userID := c.Locals("userID").(string)
+	role := c.Locals("role").(string)
+
+	var achievements []*model.AchievementWithReference
+	var err error
+
+	// Apply RBAC: Admin sees all, Dosen Wali sees advisees, Mahasiswa sees own
+	if role == "Admin" {
+		achievements, _, err = s.achievementRepo.GetAllAchievements(1, 10000)
+	} else if role == "Dosen Wali" {
+		students, err := s.studentRepo.GetStudentsByAdvisorID(userID)
+		if err != nil {
+			return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil data mahasiswa")
+		}
+
+		for _, student := range students {
+			studentAchs, err := s.achievementRepo.GetAchievementsByStudentID(student.ID)
+			if err == nil {
+				achievements = append(achievements, studentAchs...)
+			}
+		}
+	} else {
+		achievements, err = s.achievementRepo.GetAchievementsByStudentID(userID)
 	}
 
-	// Calculate statistics
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil data achievements")
+	}
+
 	stats := make(map[string]interface{})
 	totalAchievements := len(achievements)
 
-	// Count by status
 	statusCount := make(map[string]int)
 	typeCount := make(map[string]int)
 	totalPoints := 0
@@ -54,23 +78,14 @@ func (s *reportServiceImpl) GetStatistics(c *fiber.Ctx) error {
 		}
 	}
 
-	// Get top students (simplified - in production use more sophisticated query)
-	studentAchievements := make(map[string]int)
-	studentPoints := make(map[string]int)
-
-	for _, ach := range achievements {
-		if ach.Status == "verified" {
-			studentAchievements[ach.StudentID]++
-			studentPoints[ach.StudentID] += ach.Points
-		}
-	}
-
 	stats["total_achievements"] = totalAchievements
 	stats["by_status"] = statusCount
 	stats["by_type"] = typeCount
 	stats["total_points"] = totalPoints
 	stats["verified_achievements"] = statusCount["verified"]
 	stats["pending_achievements"] = statusCount["submitted"]
+	stats["draft_achievements"] = statusCount["draft"]
+	stats["rejected_achievements"] = statusCount["rejected"]
 
 	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
 		Status:  "success",
@@ -81,37 +96,35 @@ func (s *reportServiceImpl) GetStatistics(c *fiber.Ctx) error {
 
 func (s *reportServiceImpl) GetStudentReport(c *fiber.Ctx) error {
 	studentID := c.Params("id")
+	userID := c.Locals("userID").(string)
+	role := c.Locals("role").(string)
 
 	if studentID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
-			Status:  "error",
-			Message: "student_id tidak boleh kosong",
-		})
+		return helper.ErrorResponse(c, fiber.StatusBadRequest, "student_id tidak boleh kosong")
 	}
 
 	student, err := s.studentRepo.GetStudentByID(studentID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
-			Status:  "error",
-			Message: "gagal mengambil student",
-		})
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil student")
 	}
 	if student == nil {
-		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
-			Status:  "error",
-			Message: "student tidak ditemukan",
-		})
+		return helper.ErrorResponse(c, fiber.StatusNotFound, "student tidak ditemukan")
+	}
+
+	// RBAC check
+	if role == "Mahasiswa" && studentID != userID {
+		return helper.ErrorResponse(c, fiber.StatusForbidden, "anda tidak memiliki akses ke report ini")
+	}
+
+	if role == "Dosen Wali" && student.AdvisorID != userID {
+		return helper.ErrorResponse(c, fiber.StatusForbidden, "student ini bukan bimbingan anda")
 	}
 
 	achievements, err := s.achievementRepo.GetAchievementsByStudentID(studentID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
-			Status:  "error",
-			Message: "gagal mengambil achievements",
-		})
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil achievements")
 	}
 
-	// Calculate student statistics
 	report := make(map[string]interface{})
 	totalAchievements := len(achievements)
 	totalPoints := 0
@@ -137,5 +150,82 @@ func (s *reportServiceImpl) GetStudentReport(c *fiber.Ctx) error {
 		Status:  "success",
 		Message: "report berhasil diambil",
 		Data:    report,
+	})
+}
+
+func (s *reportServiceImpl) GetStatisticsByPeriod(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(string)
+	role := c.Locals("role").(string)
+
+	startDateStr := c.Query("start_date")
+	endDateStr := c.Query("end_date")
+
+	if startDateStr == "" || endDateStr == "" {
+		return helper.ErrorResponse(c, fiber.StatusBadRequest, "start_date dan end_date harus diisi")
+	}
+
+	startDate, err := time.Parse("2006-01-02", startDateStr)
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusBadRequest, "format start_date tidak valid (gunakan YYYY-MM-DD)")
+	}
+
+	endDate, err := time.Parse("2006-01-02", endDateStr)
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusBadRequest, "format end_date tidak valid (gunakan YYYY-MM-DD)")
+	}
+
+	stats, err := s.achievementRepo.GetAchievementStatsByPeriod(startDate, endDate, role, userID)
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil statistik: "+err.Error())
+	}
+
+	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
+		Status:  "success",
+		Message: "statistik berdasarkan periode berhasil diambil",
+		Data:    stats,
+	})
+}
+
+func (s *reportServiceImpl) GetStatisticsByType(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(string)
+	role := c.Locals("role").(string)
+
+	stats, err := s.achievementRepo.GetAchievementStatsByType(role, userID)
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil statistik: "+err.Error())
+	}
+
+	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
+		Status:  "success",
+		Message: "statistik berdasarkan tipe berhasil diambil",
+		Data:    stats,
+	})
+}
+
+func (s *reportServiceImpl) GetTopStudents(c *fiber.Ctx) error {
+	role := c.Locals("role").(string)
+
+	if role != "Admin" {
+		return helper.ErrorResponse(c, fiber.StatusForbidden, "hanya admin yang dapat mengakses data ini")
+	}
+
+	limitStr := c.Query("limit", "10")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 || limit > 100 {
+		limit = 10
+	}
+
+	topStudents, err := s.achievementRepo.GetTopStudents(limit)
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil top students: "+err.Error())
+	}
+
+	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
+		Status:  "success",
+		Message: "top students berhasil diambil",
+		Data: map[string]interface{}{
+			"top_students": topStudents,
+			"limit":        limit,
+		},
 	})
 }

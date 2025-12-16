@@ -42,6 +42,13 @@ func NewAchievementService(
 func (s *achievementServiceImpl) GetAllAchievements(c *fiber.Ctx) error {
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	pageSize, _ := strconv.Atoi(c.Query("page_size", "10"))
+	status := c.Query("status")
+	achievementType := c.Query("achievement_type")
+	studentID := c.Query("student_id")
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+	sortBy := c.Query("sort_by", "created_at")
+	sortOrder := c.Query("sort_order", "DESC")
 
 	if page < 1 {
 		page = 1
@@ -50,11 +57,39 @@ func (s *achievementServiceImpl) GetAllAchievements(c *fiber.Ctx) error {
 		pageSize = 10
 	}
 
-	achievements, total, err := s.achievementRepo.GetAllAchievements(page, pageSize)
+	// Build filters map
+	filters := make(map[string]interface{})
+	if status != "" {
+		filters["status"] = status
+	}
+	if achievementType != "" {
+		filters["achievement_type"] = achievementType
+	}
+	if studentID != "" {
+		filters["student_id"] = studentID
+	}
+	if startDate != "" {
+		filters["start_date"] = startDate
+	}
+	if endDate != "" {
+		filters["end_date"] = endDate
+	}
+
+	var achievements []*model.AchievementWithReference
+	var total int
+	var err error
+
+	// Use filtered query if any filters are provided
+	if len(filters) > 0 || sortBy != "created_at" || sortOrder != "DESC" {
+		achievements, total, err = s.achievementRepo.GetAchievementsWithFilters(page, pageSize, filters, sortBy, sortOrder)
+	} else {
+		achievements, total, err = s.achievementRepo.GetAllAchievements(page, pageSize)
+	}
+
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
 			Status:  "error",
-			Message: "gagal mengambil achievements",
+			Message: "gagal mengambil achievements: " + err.Error(),
 		})
 	}
 
@@ -63,6 +98,15 @@ func (s *achievementServiceImpl) GetAllAchievements(c *fiber.Ctx) error {
 		Message: "achievements berhasil diambil",
 		Data: map[string]interface{}{
 			"achievements": achievements,
+			"filters": map[string]interface{}{
+				"status":           status,
+				"achievement_type": achievementType,
+				"student_id":       studentID,
+				"start_date":       startDate,
+				"end_date":         endDate,
+				"sort_by":          sortBy,
+				"sort_order":       sortOrder,
+			},
 			"pagination": map[string]interface{}{
 				"page":       page,
 				"page_size":  pageSize,
@@ -426,7 +470,13 @@ func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
 	role := c.Locals("role").(string)
 
 	achievement, err := s.achievementRepo.GetAchievementByID(achievementID)
-	if err != nil || achievement == nil {
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengambil achievement",
+		})
+	}
+	if achievement == nil {
 		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
 			Status:  "error",
 			Message: "prestasi tidak ditemukan",

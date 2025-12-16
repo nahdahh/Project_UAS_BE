@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 	"time"
 	"uas_be/app/model"
 	"uas_be/database"
@@ -20,6 +22,7 @@ type AchievementRepository interface {
 	GetAchievementsByStudentID(studentID string) ([]*model.AchievementWithReference, error)
 	GetAchievementsByStatus(status string) ([]*model.AchievementWithReference, error)
 	GetAllAchievements(page, pageSize int) ([]*model.AchievementWithReference, int, error)
+	GetAchievementsWithFilters(page, pageSize int, filters map[string]interface{}, sortBy, sortOrder string) ([]*model.AchievementWithReference, int, error)
 	UpdateAchievement(referenceID string, achievement *model.Achievement) error
 	SubmitAchievementForVerification(id string) error
 	VerifyAchievement(id string, verifiedBy string) error
@@ -30,6 +33,10 @@ type AchievementRepository interface {
 	GetAchievementHistory(achievementID string) ([]*model.AchievementHistory, error)
 	CreateAttachment(attachment *model.AchievementAttachment) error
 	GetAttachmentsByAchievementID(achievementID string) ([]*model.AchievementAttachment, error)
+
+	GetAchievementStatsByPeriod(startDate, endDate time.Time, role, userID string) (map[string]interface{}, error)
+	GetAchievementStatsByType(role, userID string) (map[string]interface{}, error)
+	GetTopStudents(limit int) ([]*model.StudentStats, error)
 }
 
 // achievementRepositoryImpl adalah implementasi dari AchievementRepository
@@ -314,10 +321,121 @@ func (r *achievementRepositoryImpl) GetAllAchievements(page, pageSize int) ([]*m
 	return results, totalItems, nil
 }
 
+func (r *achievementRepositoryImpl) GetAchievementsWithFilters(page, pageSize int, filters map[string]interface{}, sortBy, sortOrder string) ([]*model.AchievementWithReference, int, error) {
+	ctx := context.Background()
+	offset := (page - 1) * pageSize
+
+	var whereClauses []string
+	var args []interface{}
+	argCounter := 1
+
+	whereClauses = append(whereClauses, fmt.Sprintf("status != $%d", argCounter))
+	args = append(args, model.AchievementStatusDeleted)
+	argCounter++
+
+	if status, ok := filters["status"].(string); ok && status != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("status = $%d", argCounter))
+		args = append(args, status)
+		argCounter++
+	}
+
+	if studentID, ok := filters["student_id"].(string); ok && studentID != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("student_id = $%d", argCounter))
+		args = append(args, studentID)
+		argCounter++
+	}
+
+	if startDate, ok := filters["start_date"].(string); ok && startDate != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("created_at >= $%d", argCounter))
+		args = append(args, startDate)
+		argCounter++
+	}
+
+	if endDate, ok := filters["end_date"].(string); ok && endDate != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("created_at <= $%d", argCounter))
+		args = append(args, endDate)
+		argCounter++
+	}
+
+	whereClause := strings.Join(whereClauses, " AND ")
+
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM achievement_references WHERE %s", whereClause)
+	var totalItems int
+	err := r.db.QueryRow(countQuery, args...).Scan(&totalItems)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if sortBy == "" {
+		sortBy = "created_at"
+	}
+	if sortOrder == "" || (sortOrder != "ASC" && sortOrder != "DESC") {
+		sortOrder = "DESC"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, student_id, mongo_achievement_id, achievement_title, status,
+		       submitted_at, verified_at, verified_by, rejection_note, deleted_at, created_at, updated_at
+		FROM achievement_references
+		WHERE %s
+		ORDER BY %s %s
+		LIMIT $%d OFFSET $%d
+	`, whereClause, sortBy, sortOrder, argCounter, argCounter+1)
+
+	args = append(args, pageSize, offset)
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var results []*model.AchievementWithReference
+
+	for rows.Next() {
+		var ref model.AchievementReference
+		err := rows.Scan(
+			&ref.ID, &ref.StudentID, &ref.MongoAchievementID, &ref.AchievementTitle,
+			&ref.Status, &ref.SubmittedAt, &ref.VerifiedAt, &ref.VerifiedBy,
+			&ref.RejectionNote, &ref.DeletedAt, &ref.CreatedAt, &ref.UpdatedAt,
+		)
+		if err != nil {
+			continue
+		}
+
+		mongoObjID, err := primitive.ObjectIDFromHex(ref.MongoAchievementID)
+		if err != nil {
+			continue
+		}
+
+		var achievement model.Achievement
+		mongoFilter := bson.M{"_id": mongoObjID}
+
+		if achievementType, ok := filters["achievement_type"].(string); ok && achievementType != "" {
+			mongoFilter["achievement_type"] = achievementType
+		}
+
+		err = r.mongoCollection.FindOne(ctx, mongoFilter).Decode(&achievement)
+		if err != nil {
+			continue
+		}
+
+		results = append(results, &model.AchievementWithReference{
+			Achievement:   achievement,
+			Status:        ref.Status,
+			SubmittedAt:   ref.SubmittedAt,
+			VerifiedAt:    ref.VerifiedAt,
+			VerifiedBy:    ref.VerifiedBy,
+			RejectionNote: ref.RejectionNote,
+		})
+	}
+
+	return results, totalItems, nil
+}
+
 func (r *achievementRepositoryImpl) UpdateAchievement(referenceID string, achievement *model.Achievement) error {
 	ctx := context.Background()
 
-	// Get reference to find MongoDB ID
 	var mongoID string
 	err := r.db.QueryRow("SELECT mongo_achievement_id FROM achievement_references WHERE id = $1", referenceID).Scan(&mongoID)
 	if err != nil {
@@ -329,7 +447,6 @@ func (r *achievementRepositoryImpl) UpdateAchievement(referenceID string, achiev
 		return err
 	}
 
-	// Update MongoDB
 	achievement.UpdatedAt = time.Now()
 	update := bson.M{
 		"$set": bson.M{
@@ -348,7 +465,6 @@ func (r *achievementRepositoryImpl) UpdateAchievement(referenceID string, achiev
 		return err
 	}
 
-	// Update title in PostgreSQL reference
 	_, err = r.db.Exec("UPDATE achievement_references SET achievement_title = $1, updated_at = NOW() WHERE id = $2", achievement.Title, referenceID)
 	return err
 }
@@ -468,4 +584,210 @@ func (r *achievementRepositoryImpl) GetAttachmentsByAchievementID(achievementID 
 	}
 
 	return attachments, nil
+}
+
+// GetAchievementStatsByPeriod mengambil statistik achievement berdasarkan periode waktu
+func (r *achievementRepositoryImpl) GetAchievementStatsByPeriod(startDate, endDate time.Time, role, userID string) (map[string]interface{}, error) {
+	ctx := context.Background()
+
+	whereClause := "status != $1 AND created_at >= $2 AND created_at <= $3"
+	args := []interface{}{model.AchievementStatusDeleted, startDate, endDate}
+
+	if role == "Mahasiswa" {
+		whereClause += " AND student_id = $4"
+		args = append(args, userID)
+	} else if role == "Dosen Wali" {
+		whereClause += " AND student_id IN (SELECT id FROM students WHERE advisor_id = $4)"
+		args = append(args, userID)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, student_id, mongo_achievement_id, status
+		FROM achievement_references
+		WHERE %s
+	`, whereClause)
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	statusCount := make(map[string]int)
+	typeCount := make(map[string]int)
+	totalPoints := 0
+	var mongoIDs []primitive.ObjectID
+
+	for rows.Next() {
+		var id, studentID, mongoID, status string
+		if err := rows.Scan(&id, &studentID, &mongoID, &status); err != nil {
+			continue
+		}
+
+		statusCount[status]++
+
+		objID, err := primitive.ObjectIDFromHex(mongoID)
+		if err != nil {
+			continue
+		}
+		mongoIDs = append(mongoIDs, objID)
+	}
+
+	for _, objID := range mongoIDs {
+		var achievement model.Achievement
+		err := r.mongoCollection.FindOne(ctx, bson.M{"_id": objID}).Decode(&achievement)
+		if err != nil {
+			continue
+		}
+
+		typeCount[achievement.AchievementType]++
+		if statusCount["verified"] > 0 {
+			totalPoints += achievement.Points
+		}
+	}
+
+	stats := map[string]interface{}{
+		"period": map[string]interface{}{
+			"start": startDate.Format("2006-01-02"),
+			"end":   endDate.Format("2006-01-02"),
+		},
+		"total_achievements": len(mongoIDs),
+		"by_status":          statusCount,
+		"by_type":            typeCount,
+		"total_points":       totalPoints,
+	}
+
+	return stats, nil
+}
+
+// GetAchievementStatsByType mengambil statistik achievement berdasarkan jenis achievement
+func (r *achievementRepositoryImpl) GetAchievementStatsByType(role, userID string) (map[string]interface{}, error) {
+	ctx := context.Background()
+
+	whereClause := "status != $1"
+	args := []interface{}{model.AchievementStatusDeleted}
+
+	if role == "Mahasiswa" {
+		whereClause += " AND student_id = $2"
+		args = append(args, userID)
+	} else if role == "Dosen Wali" {
+		whereClause += " AND student_id IN (SELECT id FROM students WHERE advisor_id = $2)"
+		args = append(args, userID)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT mongo_achievement_id, status
+		FROM achievement_references
+		WHERE %s
+	`, whereClause)
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	typeStats := make(map[string]map[string]int)
+
+	for rows.Next() {
+		var mongoID, status string
+		if err := rows.Scan(&mongoID, &status); err != nil {
+			continue
+		}
+
+		objID, err := primitive.ObjectIDFromHex(mongoID)
+		if err != nil {
+			continue
+		}
+
+		var achievement model.Achievement
+		err = r.mongoCollection.FindOne(ctx, bson.M{"_id": objID}).Decode(&achievement)
+		if err != nil {
+			continue
+		}
+
+		if _, ok := typeStats[achievement.AchievementType]; !ok {
+			typeStats[achievement.AchievementType] = make(map[string]int)
+		}
+		typeStats[achievement.AchievementType][status]++
+	}
+
+	return map[string]interface{}{
+		"stats_by_type": typeStats,
+	}, nil
+}
+
+// GetTopStudents mengambil top students berdasarkan jumlah achievement yang diverifikasi
+func (r *achievementRepositoryImpl) GetTopStudents(limit int) ([]*model.StudentStats, error) {
+	ctx := context.Background()
+
+	query := `
+		SELECT ar.student_id, s.nim, s.name, COUNT(ar.id) as total_achievements
+		FROM achievement_references ar
+		JOIN students s ON ar.student_id = s.id
+		WHERE ar.status = $1
+		GROUP BY ar.student_id, s.nim, s.name
+		ORDER BY total_achievements DESC
+		LIMIT $2
+	`
+
+	rows, err := r.db.Query(query, "verified", limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var topStudents []*model.StudentStats
+
+	for rows.Next() {
+		var studentID, nim, name string
+		var totalAchievements int
+
+		if err := rows.Scan(&studentID, &nim, &name, &totalAchievements); err != nil {
+			continue
+		}
+
+		mongoQuery := `
+			SELECT mongo_achievement_id
+			FROM achievement_references
+			WHERE student_id = $1 AND status = $2
+		`
+
+		mongoRows, err := r.db.Query(mongoQuery, studentID, "verified")
+		if err != nil {
+			continue
+		}
+
+		totalPoints := 0
+		for mongoRows.Next() {
+			var mongoID string
+			if err := mongoRows.Scan(&mongoID); err != nil {
+				continue
+			}
+
+			objID, err := primitive.ObjectIDFromHex(mongoID)
+			if err != nil {
+				continue
+			}
+
+			var achievement model.Achievement
+			err = r.mongoCollection.FindOne(ctx, bson.M{"_id": objID}).Decode(&achievement)
+			if err != nil {
+				continue
+			}
+
+			totalPoints += achievement.Points
+		}
+		mongoRows.Close()
+
+		topStudents = append(topStudents, &model.StudentStats{
+			StudentID:         studentID,
+			NIM:               nim,
+			Name:              name,
+			TotalAchievements: totalAchievements,
+			TotalPoints:       totalPoints,
+		})
+	}
+
+	return topStudents, nil
 }

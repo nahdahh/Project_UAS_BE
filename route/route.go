@@ -114,6 +114,9 @@ func SetupReportRoutes(app *fiber.App, reportService service.ReportService) {
 	group := app.Group("/api/v1/reports", middleware.AuthMiddleware())
 
 	group.Get("/statistics", middleware.RBACMiddleware("report:read"), reportService.GetStatistics)
+	group.Get("/statistics/period", middleware.RBACMiddleware("report:read"), reportService.GetStatisticsByPeriod)
+	group.Get("/statistics/type", middleware.RBACMiddleware("report:read"), reportService.GetStatisticsByType)
+	group.Get("/top-students", middleware.RBACMiddleware("report:read"), reportService.GetTopStudents)
 	group.Get("/student/:id", middleware.RBACMiddleware("report:read"), reportService.GetStudentReport)
 }
 
