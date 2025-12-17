@@ -21,15 +21,18 @@ type ReportService interface {
 type reportServiceImpl struct {
 	achievementRepo repository.AchievementRepository
 	studentRepo     repository.StudentRepository
+	lecturerRepo    repository.LecturerRepository
 }
 
 func NewReportService(
 	achievementRepo repository.AchievementRepository,
 	studentRepo repository.StudentRepository,
+	lecturerRepo repository.LecturerRepository,
 ) ReportService {
 	return &reportServiceImpl{
 		achievementRepo: achievementRepo,
 		studentRepo:     studentRepo,
+		lecturerRepo:    lecturerRepo,
 	}
 }
 
@@ -54,7 +57,13 @@ func (s *reportServiceImpl) GetStatistics(c *fiber.Ctx) error {
 	if role == "Admin" {
 		achievements, _, err = s.achievementRepo.GetAllAchievements(1, 10000)
 	} else if role == "Dosen Wali" {
-		students, err := s.studentRepo.GetStudentsByAdvisorID(userID)
+		// Get lecturer data for the logged-in user
+		lecturer, err := s.lecturerRepo.GetLecturerByUserID(userID)
+		if err != nil || lecturer == nil {
+			return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil data lecturer")
+		}
+
+		students, err := s.studentRepo.GetStudentsByAdvisorID(lecturer.ID)
 		if err != nil {
 			return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil data mahasiswa")
 		}
@@ -65,8 +74,16 @@ func (s *reportServiceImpl) GetStatistics(c *fiber.Ctx) error {
 				achievements = append(achievements, studentAchs...)
 			}
 		}
-	} else {
-		achievements, err = s.achievementRepo.GetAchievementsByStudentID(userID)
+	} else if role == "Mahasiswa" {
+		student, err := s.studentRepo.GetStudentByUserID(userID)
+		if err != nil {
+			return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil data student")
+		}
+		if student == nil {
+			return helper.ErrorResponse(c, fiber.StatusNotFound, "data mahasiswa tidak ditemukan")
+		}
+
+		achievements, err = s.achievementRepo.GetAchievementsByStudentID(student.ID)
 	}
 
 	if err != nil {

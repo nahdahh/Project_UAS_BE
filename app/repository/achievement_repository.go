@@ -70,7 +70,7 @@ func (r *achievementRepositoryImpl) CreateAchievement(achievement *model.Achieve
 
 	result, err := r.mongoCollection.InsertOne(ctx, achievement)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to insert achievement to MongoDB: %w", err)
 	}
 
 	mongoID := result.InsertedID.(primitive.ObjectID).Hex()
@@ -86,7 +86,7 @@ func (r *achievementRepositoryImpl) CreateAchievement(achievement *model.Achieve
 	if err != nil {
 		// Rollback: delete from MongoDB if PostgreSQL insert fails
 		r.mongoCollection.DeleteOne(ctx, bson.M{"_id": result.InsertedID})
-		return nil, err
+		return nil, fmt.Errorf("failed to create achievement reference in PostgreSQL: %w", err)
 	}
 
 	// 3. Return combined result
@@ -345,6 +345,16 @@ func (r *achievementRepositoryImpl) GetAchievementsWithFilters(page, pageSize in
 		argCounter++
 	}
 
+	if studentIDs, ok := filters["student_ids"].([]string); ok && len(studentIDs) > 0 {
+		placeholders := make([]string, len(studentIDs))
+		for i := range studentIDs {
+			placeholders[i] = fmt.Sprintf("$%d", argCounter)
+			args = append(args, studentIDs[i])
+			argCounter++
+		}
+		whereClauses = append(whereClauses, fmt.Sprintf("student_id IN (%s)", strings.Join(placeholders, ",")))
+	}
+
 	if startDate, ok := filters["start_date"].(string); ok && startDate != "" {
 		whereClauses = append(whereClauses, fmt.Sprintf("created_at >= $%d", argCounter))
 		args = append(args, startDate)
@@ -512,7 +522,7 @@ func (r *achievementRepositoryImpl) DeleteAchievement(id string) error {
 // CreateAchievementHistory menyimpan history perubahan status achievement
 func (r *achievementRepositoryImpl) CreateAchievementHistory(history *model.AchievementHistory) error {
 	query := `
-		INSERT INTO achievement_history (id, achievement_id, old_status, new_status, changed_by, note, created_at)
+		INSERT INTO achievement_history (id, achievement_id, previous_status, new_status, changed_by, notes, changed_at)
 		VALUES ($1, $2, $3, $4, $5, $6, NOW())
 	`
 	_, err := r.db.Exec(query, history.ID, history.AchievementID, history.OldStatus, history.NewStatus, history.ChangedBy, history.Note)
@@ -522,11 +532,11 @@ func (r *achievementRepositoryImpl) CreateAchievementHistory(history *model.Achi
 // GetAchievementHistory mengambil riwayat perubahan achievement
 func (r *achievementRepositoryImpl) GetAchievementHistory(achievementID string) ([]*model.AchievementHistory, error) {
 	query := `
-		SELECT ah.id, ah.achievement_id, ah.old_status, ah.new_status, ah.changed_by, u.full_name, ah.note, ah.created_at
+		SELECT ah.id, ah.achievement_id, ah.previous_status, ah.new_status, ah.changed_by, u.full_name, ah.notes, ah.changed_at
 		FROM achievement_history ah
 		JOIN users u ON ah.changed_by = u.id
 		WHERE ah.achievement_id = $1
-		ORDER BY ah.created_at DESC
+		ORDER BY ah.changed_at DESC
 	`
 
 	rows, err := r.db.Query(query, achievementID)
@@ -551,20 +561,20 @@ func (r *achievementRepositoryImpl) GetAchievementHistory(achievementID string) 
 // CreateAttachment menyimpan attachment file untuk achievement
 func (r *achievementRepositoryImpl) CreateAttachment(attachment *model.AchievementAttachment) error {
 	query := `
-		INSERT INTO achievement_attachments (id, achievement_id, file_name, file_url, file_size, file_type, uploaded_by, created_at)
+		INSERT INTO achievement_attachments (id, achievement_id, file_name, file_path, file_size, file_type, uploaded_by, uploaded_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
 	`
-	_, err := r.db.Exec(query, attachment.ID, attachment.AchievementID, attachment.FileName, attachment.FileURL, attachment.FileSize, attachment.FileType, attachment.UploadedBy)
+	_, err := r.db.Exec(query, attachment.ID, attachment.AchievementID, attachment.FileName, attachment.FilePath, attachment.FileSize, attachment.FileType, attachment.UploadedBy)
 	return err
 }
 
 // GetAttachmentsByAchievementID mengambil semua attachment dari achievement
 func (r *achievementRepositoryImpl) GetAttachmentsByAchievementID(achievementID string) ([]*model.AchievementAttachment, error) {
 	query := `
-		SELECT id, achievement_id, file_name, file_url, file_size, file_type, uploaded_by, created_at
+		SELECT id, achievement_id, file_name, file_path, file_size, file_type, uploaded_by, uploaded_at
 		FROM achievement_attachments
 		WHERE achievement_id = $1
-		ORDER BY created_at DESC
+		ORDER BY uploaded_at DESC
 	`
 
 	rows, err := r.db.Query(query, achievementID)
@@ -576,7 +586,7 @@ func (r *achievementRepositoryImpl) GetAttachmentsByAchievementID(achievementID 
 	var attachments []*model.AchievementAttachment
 	for rows.Next() {
 		attachment := &model.AchievementAttachment{}
-		err := rows.Scan(&attachment.ID, &attachment.AchievementID, &attachment.FileName, &attachment.FileURL, &attachment.FileSize, &attachment.FileType, &attachment.UploadedBy, &attachment.CreatedAt)
+		err := rows.Scan(&attachment.ID, &attachment.AchievementID, &attachment.FileName, &attachment.FilePath, &attachment.FileSize, &attachment.FileType, &attachment.UploadedBy, &attachment.UploadedAt)
 		if err != nil {
 			return nil, err
 		}

@@ -21,15 +21,18 @@ type AuthService interface {
 type authServiceImpl struct {
 	userRepo       repository.UserRepository
 	permissionRepo repository.PermissionRepository
+	roleRepo       repository.RoleRepository
 }
 
 func NewAuthService(
 	userRepo repository.UserRepository,
 	permissionRepo repository.PermissionRepository,
+	roleRepo repository.RoleRepository,
 ) AuthService {
 	return &authServiceImpl{
 		userRepo:       userRepo,
 		permissionRepo: permissionRepo,
+		roleRepo:       roleRepo,
 	}
 }
 
@@ -83,12 +86,20 @@ func (s *authServiceImpl) Login(c *fiber.Ctx) error {
 		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil permissions")
 	}
 
-	token, err := utils.GenerateToken(user.ID, user.Username, user.Email, user.RoleID, permissionNames, 24*time.Hour)
+	role, err := s.roleRepo.GetRoleByID(user.RoleID)
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil role")
+	}
+	if role == nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "role tidak ditemukan")
+	}
+
+	token, err := utils.GenerateToken(user.ID, user.Username, user.Email, role.Name, permissionNames, 24*time.Hour)
 	if err != nil {
 		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal generate token")
 	}
 
-	refreshToken, err := utils.GenerateToken(user.ID, user.Username, user.Email, user.RoleID, permissionNames, 7*24*time.Hour)
+	refreshToken, err := utils.GenerateToken(user.ID, user.Username, user.Email, role.Name, permissionNames, 7*24*time.Hour)
 	if err != nil {
 		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal generate refresh token")
 	}
@@ -138,6 +149,14 @@ func (s *authServiceImpl) GetProfile(c *fiber.Ctx) error {
 		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil permissions")
 	}
 
+	role, err := s.roleRepo.GetRoleByID(user.RoleID)
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil role")
+	}
+	if role == nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "role tidak ditemukan")
+	}
+
 	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
 		Status:  "success",
 		Message: "profile berhasil diambil",
@@ -146,7 +165,7 @@ func (s *authServiceImpl) GetProfile(c *fiber.Ctx) error {
 			"username":    user.Username,
 			"email":       user.Email,
 			"full_name":   user.FullName,
-			"role_id":     user.RoleID,
+			"role":        role.Name,
 			"permissions": permissionNames,
 			"is_active":   user.IsActive,
 			"created_at":  user.CreatedAt.Format(time.RFC3339),
@@ -204,12 +223,20 @@ func (s *authServiceImpl) RefreshToken(c *fiber.Ctx) error {
 		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil permissions")
 	}
 
-	newToken, err := utils.GenerateToken(user.ID, user.Username, user.Email, user.RoleID, permissionNames, 24*time.Hour)
+	role, err := s.roleRepo.GetRoleByID(user.RoleID)
+	if err != nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil role")
+	}
+	if role == nil {
+		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "role tidak ditemukan")
+	}
+
+	newToken, err := utils.GenerateToken(user.ID, user.Username, user.Email, role.Name, permissionNames, 24*time.Hour)
 	if err != nil {
 		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal generate token")
 	}
 
-	newRefreshToken, err := utils.GenerateToken(user.ID, user.Username, user.Email, user.RoleID, permissionNames, 7*24*time.Hour)
+	newRefreshToken, err := utils.GenerateToken(user.ID, user.Username, user.Email, role.Name, permissionNames, 7*24*time.Hour)
 	if err != nil {
 		return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal generate refresh token")
 	}

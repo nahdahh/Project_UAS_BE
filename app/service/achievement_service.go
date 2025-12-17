@@ -1,6 +1,7 @@
 package service
 
 import (
+	"os"
 	"strconv"
 	"time"
 	"uas_be/app/model"
@@ -27,15 +28,18 @@ type AchievementService interface {
 type achievementServiceImpl struct {
 	achievementRepo repository.AchievementRepository
 	studentRepo     repository.StudentRepository
+	lecturerRepo    repository.LecturerRepository
 }
 
 func NewAchievementService(
 	achievementRepo repository.AchievementRepository,
 	studentRepo repository.StudentRepository,
+	lecturerRepo repository.LecturerRepository,
 ) AchievementService {
 	return &achievementServiceImpl{
 		achievementRepo: achievementRepo,
 		studentRepo:     studentRepo,
+		lecturerRepo:    lecturerRepo,
 	}
 }
 
@@ -69,6 +73,9 @@ func (s *achievementServiceImpl) GetAllAchievements(c *fiber.Ctx) error {
 	sortBy := c.Query("sort_by", "created_at")
 	sortOrder := c.Query("sort_order", "DESC")
 
+	userID := c.Locals("userID").(string)
+	role := c.Locals("role").(string)
+
 	if page < 1 {
 		page = 1
 	}
@@ -92,6 +99,66 @@ func (s *achievementServiceImpl) GetAllAchievements(c *fiber.Ctx) error {
 	}
 	if endDate != "" {
 		filters["end_date"] = endDate
+	}
+
+	// Add role-based access control
+	switch role {
+	case "Mahasiswa":
+		// Students can only see their own achievements
+		student, err := s.studentRepo.GetStudentByUserID(userID)
+		if err != nil || student == nil {
+			return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "student data tidak ditemukan",
+			})
+		}
+		filters["student_id"] = student.ID
+
+	case "Dosen Wali":
+		// Advisors can only see achievements of their advisees
+		students, err := s.studentRepo.GetStudentsByAdvisorID(userID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "gagal mengambil data mahasiswa bimbingan",
+			})
+		}
+		if len(students) == 0 {
+			// No advisees, return empty result
+			return c.Status(fiber.StatusOK).JSON(model.APIResponse{
+				Status:  "success",
+				Message: "achievements berhasil diambil",
+				Data: map[string]interface{}{
+					"achievements": []*model.AchievementWithReference{},
+					"filters": map[string]interface{}{
+						"status":           status,
+						"achievement_type": achievementType,
+						"student_id":       studentID,
+						"start_date":       startDate,
+						"end_date":         endDate,
+						"sort_by":          sortBy,
+						"sort_order":       sortOrder,
+					},
+					"pagination": map[string]interface{}{
+						"page":       page,
+						"page_size":  pageSize,
+						"total":      0,
+						"total_page": 0,
+					},
+				},
+			})
+		}
+		// Add student IDs to filter
+		studentIDs := make([]string, len(students))
+		for i, student := range students {
+			studentIDs[i] = student.ID
+		}
+		filters["student_ids"] = studentIDs
+
+	case "Admin":
+		// Admins can see all achievements (no additional filter needed)
+		// If student_id is provided in query, it will be used
+		break
 	}
 
 	var achievements []*model.AchievementWithReference
@@ -175,11 +242,14 @@ func (s *achievementServiceImpl) GetAchievementDetail(c *fiber.Ctx) error {
 	}
 
 	role := c.Locals("role").(string)
-	if role == "Mahasiswa" && achievement.StudentID != studentID {
-		return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
-			Status:  "error",
-			Message: "unauthorized",
-		})
+	if role == "Mahasiswa" {
+		student, err := s.studentRepo.GetStudentByUserID(studentID)
+		if err != nil || student == nil || achievement.StudentID != student.ID {
+			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "unauthorized",
+			})
+		}
 	}
 
 	if role == "Dosen Wali" {
@@ -213,7 +283,7 @@ func (s *achievementServiceImpl) GetAchievementDetail(c *fiber.Ctx) error {
 // @Failure 500 {object} model.APIResponse "Internal server error"
 // @Router /achievements [post]
 func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
-	studentID := c.Locals("userID").(string)
+	userID := c.Locals("userID").(string)
 
 	var req model.CreateAchievementRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -224,11 +294,17 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 	}
 
 	// Validate student exists
-	student, err := s.studentRepo.GetStudentByID(studentID)
-	if err != nil || student == nil {
+	student, err := s.studentRepo.GetStudentByUserID(userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal mengambil data student: " + err.Error(),
+		})
+	}
+	if student == nil {
 		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
 			Status:  "error",
-			Message: "student tidak ditemukan",
+			Message: "student tidak ditemukan untuk userID: " + userID,
 		})
 	}
 
@@ -242,11 +318,11 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 		Points:          req.Points,
 	}
 
-	result, err := s.achievementRepo.CreateAchievement(achievement, studentID)
+	result, err := s.achievementRepo.CreateAchievement(achievement, student.ID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
 			Status:  "error",
-			Message: "gagal membuat achievement",
+			Message: "gagal membuat achievement untuk student ID " + student.ID + ": " + err.Error(),
 		})
 	}
 
@@ -294,11 +370,14 @@ func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 		})
 	}
 
-	if role == "Mahasiswa" && achievement.StudentID != studentID {
-		return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
-			Status:  "error",
-			Message: "prestasi bukan milik anda",
-		})
+	if role == "Mahasiswa" {
+		student, err := s.studentRepo.GetStudentByUserID(studentID)
+		if err != nil || student == nil || achievement.StudentID != student.ID {
+			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "prestasi bukan milik anda",
+			})
+		}
 	}
 
 	if role == "Dosen Wali" {
@@ -367,7 +446,8 @@ func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 // @Router /achievements/{id}/submit [post]
 func (s *achievementServiceImpl) SubmitAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
-	studentID := c.Locals("userID").(string)
+	userID := c.Locals("userID").(string)
+	role := c.Locals("role").(string)
 
 	achievement, err := s.achievementRepo.GetAchievementByID(achievementID)
 	if err != nil || achievement == nil {
@@ -377,10 +457,22 @@ func (s *achievementServiceImpl) SubmitAchievement(c *fiber.Ctx) error {
 		})
 	}
 
-	if achievement.StudentID != studentID {
-		return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+	// Check ownership for students
+	if role == "Mahasiswa" {
+		student, err := s.studentRepo.GetStudentByUserID(userID)
+		if err != nil || student == nil || achievement.StudentID != student.ID {
+			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "prestasi bukan milik anda",
+			})
+		}
+	}
+
+	// Dosen wali cannot submit achievements
+	if role == "Dosen Wali" {
+		return c.Status(fiber.StatusForbidden).JSON(model.APIResponse{
 			Status:  "error",
-			Message: "prestasi bukan milik anda",
+			Message: "dosen wali tidak dapat mensubmit prestasi",
 		})
 	}
 
@@ -397,6 +489,17 @@ func (s *achievementServiceImpl) SubmitAchievement(c *fiber.Ctx) error {
 			Message: "gagal submit achievement",
 		})
 	}
+
+	// Create history
+	note := "Achievement submitted for verification"
+	history := &model.AchievementHistory{
+		AchievementID: achievementID,
+		OldStatus:     model.AchievementStatusDraft,
+		NewStatus:     model.AchievementStatusSubmitted,
+		ChangedBy:     userID,
+		Note:          &note,
+	}
+	s.achievementRepo.CreateAchievementHistory(history)
 
 	// Refresh data
 	achievement, _ = s.achievementRepo.GetAchievementByID(achievementID)
@@ -458,10 +561,19 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 			})
 		}
 
-		if student.AdvisorID != verifiedBy {
+		// Get lecturer data for the logged-in user
+		lecturer, err := s.lecturerRepo.GetLecturerByUserID(verifiedBy)
+		if err != nil || lecturer == nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "gagal mengambil data lecturer",
+			})
+		}
+
+		if student.AdvisorID != lecturer.ID {
 			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
 				Status:  "error",
-				Message: "anda bukan advisor dari student ini",
+				Message: "anda bukan advisor dari student ini (student advisor: " + student.AdvisorID + ", your lecturer ID: " + lecturer.ID + ")",
 			})
 		}
 	}
@@ -472,6 +584,17 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 			Message: "gagal verify achievement",
 		})
 	}
+
+	// Create history
+	note := "Achievement verified"
+	history := &model.AchievementHistory{
+		AchievementID: achievementID,
+		OldStatus:     model.AchievementStatusSubmitted,
+		NewStatus:     model.AchievementStatusVerified,
+		ChangedBy:     verifiedBy,
+		Note:          &note,
+	}
+	s.achievementRepo.CreateAchievementHistory(history)
 
 	// Refresh data
 	achievement, _ = s.achievementRepo.GetAchievementByID(achievementID)
@@ -515,6 +638,14 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 		})
 	}
 
+	// Validate rejection note
+	if req.RejectionNote == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "rejection_note tidak boleh kosong",
+		})
+	}
+
 	achievement, err := s.achievementRepo.GetAchievementByID(achievementID)
 	if err != nil || achievement == nil {
 		return c.Status(fiber.StatusNotFound).JSON(model.APIResponse{
@@ -546,7 +677,16 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 			})
 		}
 
-		if student.AdvisorID != rejectedBy {
+		// Get lecturer data for the logged-in user
+		lecturer, err := s.lecturerRepo.GetLecturerByUserID(rejectedBy)
+		if err != nil || lecturer == nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "gagal mengambil data lecturer",
+			})
+		}
+
+		if student.AdvisorID != lecturer.ID {
 			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
 				Status:  "error",
 				Message: "anda bukan advisor dari student ini",
@@ -560,6 +700,17 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 			Message: "gagal reject achievement",
 		})
 	}
+
+	// Create history
+	note := "Achievement rejected: " + req.RejectionNote
+	history := &model.AchievementHistory{
+		AchievementID: achievementID,
+		OldStatus:     model.AchievementStatusSubmitted,
+		NewStatus:     model.AchievementStatusRejected,
+		ChangedBy:     rejectedBy,
+		Note:          &note,
+	}
+	s.achievementRepo.CreateAchievementHistory(history)
 
 	// Refresh data
 	achievement, _ = s.achievementRepo.GetAchievementByID(achievementID)
@@ -587,7 +738,7 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 // @Router /achievements/{id} [delete]
 func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
-	studentID := c.Locals("userID").(string)
+	userID := c.Locals("userID").(string)
 	role := c.Locals("role").(string)
 
 	achievement, err := s.achievementRepo.GetAchievementByID(achievementID)
@@ -604,13 +755,18 @@ func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
 		})
 	}
 
-	if role == "Mahasiswa" && achievement.StudentID != studentID {
-		return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
-			Status:  "error",
-			Message: "prestasi bukan milik anda",
-		})
+	// Check ownership for students
+	if role == "Mahasiswa" {
+		student, err := s.studentRepo.GetStudentByUserID(userID)
+		if err != nil || student == nil || achievement.StudentID != student.ID {
+			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "prestasi bukan milik anda",
+			})
+		}
 	}
 
+	// Dosen wali cannot delete achievements
 	if role == "Dosen Wali" {
 		return c.Status(fiber.StatusForbidden).JSON(model.APIResponse{
 			Status:  "error",
@@ -631,6 +787,17 @@ func (s *achievementServiceImpl) DeleteAchievement(c *fiber.Ctx) error {
 			Message: "gagal menghapus achievement",
 		})
 	}
+
+	// Create history
+	note := "Achievement soft deleted"
+	history := &model.AchievementHistory{
+		AchievementID: achievementID,
+		OldStatus:     model.AchievementStatusDraft,
+		NewStatus:     model.AchievementStatusDeleted,
+		ChangedBy:     userID,
+		Note:          &note,
+	}
+	s.achievementRepo.CreateAchievementHistory(history)
 
 	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
 		Status:  "success",
@@ -790,11 +957,24 @@ func (s *achievementServiceImpl) GetAchievementHistory(c *fiber.Ctx) error {
 	}
 
 	role := c.Locals("role").(string)
-	if role == "Mahasiswa" && achievement.StudentID != userID {
-		return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
-			Status:  "error",
-			Message: "unauthorized",
-		})
+	if role == "Mahasiswa" {
+		student, err := s.studentRepo.GetStudentByUserID(userID)
+		if err != nil || student == nil || achievement.StudentID != student.ID {
+			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "unauthorized",
+			})
+		}
+	}
+
+	if role == "Dosen Wali" {
+		student, err := s.studentRepo.GetStudentByID(achievement.StudentID)
+		if err != nil || student == nil || student.AdvisorID != userID {
+			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "anda tidak memiliki akses ke history achievement ini",
+			})
+		}
 	}
 
 	history, err := s.achievementRepo.GetAchievementHistory(achievementID)
@@ -852,10 +1032,21 @@ func (s *achievementServiceImpl) UploadAttachment(c *fiber.Ctx) error {
 		})
 	}
 
-	if achievement.StudentID != userID {
-		return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+	role := c.Locals("role").(string)
+	if role == "Mahasiswa" {
+		student, err := s.studentRepo.GetStudentByUserID(userID)
+		if err != nil || student == nil || achievement.StudentID != student.ID {
+			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "unauthorized",
+			})
+		}
+	}
+
+	if role == "Dosen Wali" {
+		return c.Status(fiber.StatusForbidden).JSON(model.APIResponse{
 			Status:  "error",
-			Message: "unauthorized",
+			Message: "dosen wali tidak dapat upload attachment",
 		})
 	}
 
@@ -871,6 +1062,14 @@ func (s *achievementServiceImpl) UploadAttachment(c *fiber.Ctx) error {
 	fileName := uuid.New().String() + "_" + file.Filename
 	filePath := "./uploads/" + fileName
 
+	// Ensure uploads directory exists
+	if err := os.MkdirAll("./uploads", 0755); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal membuat direktori uploads",
+		})
+	}
+
 	if err := c.SaveFile(file, filePath); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
 			Status:  "error",
@@ -882,11 +1081,11 @@ func (s *achievementServiceImpl) UploadAttachment(c *fiber.Ctx) error {
 		ID:            uuid.New().String(),
 		AchievementID: achievementID,
 		FileName:      file.Filename,
-		FileURL:       "/uploads/" + fileName,
+		FilePath:      "/uploads/" + fileName,
 		FileSize:      file.Size,
 		FileType:      file.Header.Get("Content-Type"),
 		UploadedBy:    userID,
-		CreatedAt:     time.Now(),
+		UploadedAt:    time.Now(),
 	}
 
 	if err := s.achievementRepo.CreateAttachment(attachment); err != nil {

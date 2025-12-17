@@ -19,14 +19,14 @@ func RegisterRoutes(app *fiber.App) {
 	permissionRepo := repository.NewPermissionRepository(db)
 	userRepo := repository.NewUserRepository(db)
 
-	authService := service.NewAuthService(userRepo, permissionRepo)
-	achievementService := service.NewAchievementService(achievementRepo, studentRepo)
+	authService := service.NewAuthService(userRepo, permissionRepo, roleRepo)
+	achievementService := service.NewAchievementService(achievementRepo, studentRepo, lecturerRepo)
 	lecturerService := service.NewLecturerService(lecturerRepo, studentRepo)
 	studentService := service.NewStudentService(studentRepo, achievementRepo)
 	roleService := service.NewRoleService(roleRepo, permissionRepo)
 	userService := service.NewUserService(userRepo)
 	permissionService := service.NewPermissionService(permissionRepo)
-	reportService := service.NewReportService(achievementRepo, studentRepo)
+	reportService := service.NewReportService(achievementRepo, studentRepo, lecturerRepo)
 
 	SetupAuthRoutes(app, authService)
 	SetupAchievementRoutes(app, achievementService)

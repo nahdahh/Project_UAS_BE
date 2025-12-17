@@ -277,13 +277,13 @@ func InitSchema(db *sql.DB) error {
 	-- Assign permissions ke role Mahasiswa
 	INSERT INTO role_permissions (role_id, permission_id)
 	SELECT r.id, p.id FROM roles r, permissions p 
-	WHERE r.name = 'Mahasiswa' AND p.name IN ('achievement:create', 'achievement:read', 'achievement:update', 'achievement:delete', 'achievement:submit')
+	WHERE r.name = 'Mahasiswa' AND p.name IN ('achievement:create', 'achievement:read', 'achievement:update', 'achievement:delete', 'achievement:submit', 'report:read')
 	ON CONFLICT DO NOTHING;
 
 	-- Assign permissions ke role Dosen Wali
 	INSERT INTO role_permissions (role_id, permission_id)
 	SELECT r.id, p.id FROM roles r, permissions p 
-	WHERE r.name = 'Dosen Wali' AND p.name IN ('achievement:read', 'achievement:verify')
+	WHERE r.name = 'Dosen Wali' AND p.name IN ('achievement:read', 'achievement:verify', 'report:read')
 	ON CONFLICT DO NOTHING;
 	`
 
@@ -305,7 +305,43 @@ func InitSchema(db *sql.DB) error {
 // Fungsi ini akan dijalankan setiap kali aplikasi start untuk memastikan schema up-to-date
 func syncSchemaUpdates(db *sql.DB) error {
 	updates := []string{
-		// Update 1: Tambahkan kolom deleted_at jika belum ada
+		// Update 1: Tambahkan kolom mongo_achievement_id jika belum ada
+		`DO $$ 
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM information_schema.columns 
+				WHERE table_name='achievement_references' AND column_name='mongo_achievement_id'
+			) THEN
+				ALTER TABLE achievement_references ADD COLUMN mongo_achievement_id VARCHAR(24);
+				RAISE NOTICE 'Added mongo_achievement_id column to achievement_references';
+			END IF;
+		END $$;`,
+
+		// Update 1.1: Tambahkan kolom achievement_title jika belum ada
+		`DO $$ 
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM information_schema.columns 
+				WHERE table_name='achievement_references' AND column_name='achievement_title'
+			) THEN
+				ALTER TABLE achievement_references ADD COLUMN achievement_title VARCHAR(255);
+				RAISE NOTICE 'Added achievement_title column to achievement_references';
+			END IF;
+		END $$;`,
+
+		// Update 1.2: Tambahkan kolom updated_at jika belum ada
+		`DO $$ 
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM information_schema.columns 
+				WHERE table_name='achievement_references' AND column_name='updated_at'
+			) THEN
+				ALTER TABLE achievement_references ADD COLUMN updated_at TIMESTAMP DEFAULT NOW();
+				RAISE NOTICE 'Added updated_at column to achievement_references';
+			END IF;
+		END $$;`,
+
+		// Update 2: Tambahkan kolom deleted_at jika belum ada
 		`DO $$ 
 		BEGIN
 			IF NOT EXISTS (
@@ -319,19 +355,19 @@ func syncSchemaUpdates(db *sql.DB) error {
 			END IF;
 		END $$;`,
 
-		// Update 2: Tambahkan index untuk performa query
+		// Update 3: Tambahkan index untuk performa query
 		`CREATE INDEX IF NOT EXISTS idx_achievement_references_status 
 			ON achievement_references(status) WHERE status != 'deleted';`,
 
 		`CREATE INDEX IF NOT EXISTS idx_achievement_references_student_status 
 			ON achievement_references(student_id, status) WHERE status != 'deleted';`,
 
-		// Update 3: Pastikan permission report:read ada
+		// Update 4: Pastikan permission report:read ada
 		`INSERT INTO permissions (name, resource, action, description) VALUES
 			('report:read', 'report', 'read', 'Membaca laporan dan statistik')
 		ON CONFLICT (name) DO NOTHING;`,
 
-		// Update 4: Assign report:read permission ke Admin
+		// Update 5: Assign report:read permission ke Admin
 		`INSERT INTO role_permissions (role_id, permission_id)
 		SELECT r.id, p.id FROM roles r, permissions p 
 		WHERE r.name = 'Admin' AND p.name = 'report:read'
