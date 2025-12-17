@@ -525,8 +525,17 @@ func (r *achievementRepositoryImpl) CreateAchievementHistory(history *model.Achi
 		INSERT INTO achievement_history (id, achievement_id, previous_status, new_status, changed_by, notes, changed_at)
 		VALUES ($1, $2, $3, $4, $5, $6, NOW())
 	`
-	_, err := r.db.Exec(query, history.ID, history.AchievementID, history.OldStatus, history.NewStatus, history.ChangedBy, history.Note)
-	return err
+	result, err := r.db.Exec(query, history.ID, history.AchievementID, history.OldStatus, history.NewStatus, history.ChangedBy, history.Note)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("no rows inserted into achievement_history")
+	}
+
+	return nil
 }
 
 // GetAchievementHistory mengambil riwayat perubahan achievement

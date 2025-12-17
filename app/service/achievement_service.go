@@ -490,16 +490,19 @@ func (s *achievementServiceImpl) SubmitAchievement(c *fiber.Ctx) error {
 		})
 	}
 
-	// Create history
 	note := "Achievement submitted for verification"
 	history := &model.AchievementHistory{
+		ID:            uuid.New().String(),
 		AchievementID: achievementID,
 		OldStatus:     model.AchievementStatusDraft,
 		NewStatus:     model.AchievementStatusSubmitted,
 		ChangedBy:     userID,
 		Note:          &note,
 	}
-	s.achievementRepo.CreateAchievementHistory(history)
+	if err := s.achievementRepo.CreateAchievementHistory(history); err != nil {
+		// Log the actual error for debugging
+		println("[v0] Error creating history:", err.Error())
+	}
 
 	// Refresh data
 	achievement, _ = s.achievementRepo.GetAchievementByID(achievementID)
@@ -585,22 +588,25 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 		})
 	}
 
-	// Create history
 	note := "Achievement verified"
 	history := &model.AchievementHistory{
+		ID:            uuid.New().String(),
 		AchievementID: achievementID,
 		OldStatus:     model.AchievementStatusSubmitted,
 		NewStatus:     model.AchievementStatusVerified,
 		ChangedBy:     verifiedBy,
 		Note:          &note,
 	}
-	s.achievementRepo.CreateAchievementHistory(history)
+	if err := s.achievementRepo.CreateAchievementHistory(history); err != nil {
+		// Log the actual error for debugging
+		println("[v0] Error creating history:", err.Error())
+	}
 
 	// Refresh data
 	achievement, _ = s.achievementRepo.GetAchievementByID(achievementID)
 	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
 		Status:  "success",
-		Message: "achievement berhasil diverify",
+		Message: "achievement berhasil diverifikasi",
 		Data:    achievement,
 	})
 }
@@ -632,9 +638,9 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 
 	var req RejectRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(model.APIResponse{
 			Status:  "error",
-			Message: "format request tidak valid: " + err.Error(),
+			Message: "format request tidak valid. Pastikan mengirim JSON dengan field 'rejection_note'",
 		})
 	}
 
@@ -689,7 +695,7 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 		if student.AdvisorID != lecturer.ID {
 			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
 				Status:  "error",
-				Message: "anda bukan advisor dari student ini",
+				Message: "anda tidak memiliki akses ke prestasi ini",
 			})
 		}
 	}
@@ -701,22 +707,25 @@ func (s *achievementServiceImpl) RejectAchievement(c *fiber.Ctx) error {
 		})
 	}
 
-	// Create history
 	note := "Achievement rejected: " + req.RejectionNote
 	history := &model.AchievementHistory{
+		ID:            uuid.New().String(),
 		AchievementID: achievementID,
 		OldStatus:     model.AchievementStatusSubmitted,
 		NewStatus:     model.AchievementStatusRejected,
 		ChangedBy:     rejectedBy,
 		Note:          &note,
 	}
-	s.achievementRepo.CreateAchievementHistory(history)
+	if err := s.achievementRepo.CreateAchievementHistory(history); err != nil {
+		// Log the actual error for debugging
+		println("[v0] Error creating history:", err.Error())
+	}
 
 	// Refresh data
 	achievement, _ = s.achievementRepo.GetAchievementByID(achievementID)
 	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
 		Status:  "success",
-		Message: "achievement berhasil direject",
+		Message: "achievement berhasil ditolak",
 		Data:    achievement,
 	})
 }
@@ -958,8 +967,8 @@ func (s *achievementServiceImpl) GetAchievementHistory(c *fiber.Ctx) error {
 
 	role := c.Locals("role").(string)
 	if role == "Mahasiswa" {
-		student, err := s.studentRepo.GetStudentByUserID(userID)
-		if err != nil || student == nil || achievement.StudentID != student.ID {
+		student, err := s.studentRepo.GetStudentByID(achievement.StudentID)
+		if err != nil || student == nil || student.UserID != userID {
 			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
 				Status:  "error",
 				Message: "unauthorized",
@@ -969,7 +978,22 @@ func (s *achievementServiceImpl) GetAchievementHistory(c *fiber.Ctx) error {
 
 	if role == "Dosen Wali" {
 		student, err := s.studentRepo.GetStudentByID(achievement.StudentID)
-		if err != nil || student == nil || student.AdvisorID != userID {
+		if err != nil || student == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "student tidak ditemukan",
+			})
+		}
+
+		lecturer, err := s.lecturerRepo.GetLecturerByUserID(userID)
+		if err != nil || lecturer == nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+				Status:  "error",
+				Message: "gagal mengambil data lecturer",
+			})
+		}
+
+		if student.AdvisorID != lecturer.ID {
 			return c.Status(fiber.StatusUnauthorized).JSON(model.APIResponse{
 				Status:  "error",
 				Message: "anda tidak memiliki akses ke history achievement ini",

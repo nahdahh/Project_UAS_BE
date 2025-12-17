@@ -153,12 +153,22 @@ func (s *reportServiceImpl) GetStudentReport(c *fiber.Ctx) error {
 	}
 
 	// RBAC check
-	if role == "Mahasiswa" && studentID != userID {
-		return helper.ErrorResponse(c, fiber.StatusForbidden, "anda tidak memiliki akses ke report ini")
+	if role == "Mahasiswa" {
+		// Check if the logged-in user owns this student record
+		if student.UserID != userID {
+			return helper.ErrorResponse(c, fiber.StatusForbidden, "anda tidak memiliki akses ke report ini")
+		}
 	}
 
-	if role == "Dosen Wali" && student.AdvisorID != userID {
-		return helper.ErrorResponse(c, fiber.StatusForbidden, "student ini bukan bimbingan anda")
+	if role == "Dosen Wali" {
+		lecturer, err := s.lecturerRepo.GetLecturerByUserID(userID)
+		if err != nil || lecturer == nil {
+			return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil data lecturer")
+		}
+		
+		if student.AdvisorID != lecturer.ID {
+			return helper.ErrorResponse(c, fiber.StatusForbidden, "student ini bukan bimbingan anda")
+		}
 	}
 
 	achievements, err := s.achievementRepo.GetAchievementsByStudentID(studentID)

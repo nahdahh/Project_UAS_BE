@@ -51,7 +51,7 @@ func SetupAchievementRoutes(app *fiber.App, achievementService service.Achieveme
 
 	group.Get("/", middleware.RBACMiddleware("achievement:read"), achievementService.GetAllAchievements)
 	group.Get("/:id", middleware.RBACMiddleware("achievement:read"), achievementService.GetAchievementDetail)
-	group.Get("/:id/history", middleware.RBACMiddleware("achievement:read"), achievementService.GetAchievementHistory)
+	group.Get("/:id/history", achievementService.GetAchievementHistory)
 	group.Post("/", middleware.RBACMiddleware("achievement:create"), achievementService.CreateAchievement)
 	group.Post("/:id/attachments", middleware.RBACMiddleware("achievement:update"), achievementService.UploadAttachment)
 	group.Put("/:id", middleware.RBACMiddleware("achievement:update"), achievementService.UpdateAchievement)
@@ -113,11 +113,11 @@ func SetupUserRoutes(app *fiber.App, userService service.UserService) {
 func SetupReportRoutes(app *fiber.App, reportService service.ReportService) {
 	group := app.Group("/api/v1/reports", middleware.AuthMiddleware())
 
-	group.Get("/statistics", middleware.RBACMiddleware("report:read"), reportService.GetStatistics)
-	group.Get("/statistics/period", middleware.RBACMiddleware("report:read"), reportService.GetStatisticsByPeriod)
-	group.Get("/statistics/type", middleware.RBACMiddleware("report:read"), reportService.GetStatisticsByType)
-	group.Get("/top-students", middleware.RBACMiddleware("report:read"), reportService.GetTopStudents)
-	group.Get("/student/:id", middleware.RBACMiddleware("report:read"), reportService.GetStudentReport)
+	group.Get("/statistics", reportService.GetStatistics)
+	group.Get("/statistics/period", reportService.GetStatisticsByPeriod)
+	group.Get("/statistics/type", reportService.GetStatisticsByType)
+	group.Get("/top-students", reportService.GetTopStudents)
+	group.Get("/student/:id", reportService.GetStudentReport)
 }
 
 func SetupPermissionRoutes(app *fiber.App, permissionService service.PermissionService) {
