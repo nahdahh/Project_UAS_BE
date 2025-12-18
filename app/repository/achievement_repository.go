@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 	"uas_be/app/model"
@@ -736,76 +737,77 @@ func (r *achievementRepositoryImpl) GetAchievementStatsByType(role, userID strin
 	}, nil
 }
 
-// GetTopStudents mengambil top students berdasarkan jumlah achievement yang diverifikasi
+// GetTopStudents mengambil top students berdasarkan total poin achievement yang diverifikasi
 func (r *achievementRepositoryImpl) GetTopStudents(limit int) ([]*model.StudentStats, error) {
 	ctx := context.Background()
 
+	// Get all verified achievement references
 	query := `
-		SELECT ar.student_id, s.nim, s.name, COUNT(ar.id) as total_achievements
+		SELECT ar.student_id, s.student_id, u.full_name, ar.mongo_achievement_id
 		FROM achievement_references ar
 		JOIN students s ON ar.student_id = s.id
+		JOIN users u ON s.user_id = u.id
 		WHERE ar.status = $1
-		GROUP BY ar.student_id, s.nim, s.name
-		ORDER BY total_achievements DESC
-		LIMIT $2
+		ORDER BY ar.student_id
 	`
 
-	rows, err := r.db.Query(query, "verified", limit)
+	rows, err := r.db.Query(query, "verified")
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var topStudents []*model.StudentStats
+	// Group by student and calculate total points
+	studentMap := make(map[string]*model.StudentStats)
 
 	for rows.Next() {
-		var studentID, nim, name string
-		var totalAchievements int
+		var studentID, nim, name, mongoID string
 
-		if err := rows.Scan(&studentID, &nim, &name, &totalAchievements); err != nil {
+		if err := rows.Scan(&studentID, &nim, &name, &mongoID); err != nil {
 			continue
 		}
 
-		mongoQuery := `
-			SELECT mongo_achievement_id
-			FROM achievement_references
-			WHERE student_id = $1 AND status = $2
-		`
+		points := 0 // Default points if MongoDB query fails
 
-		mongoRows, err := r.db.Query(mongoQuery, studentID, "verified")
-		if err != nil {
-			continue
-		}
-
-		totalPoints := 0
-		for mongoRows.Next() {
-			var mongoID string
-			if err := mongoRows.Scan(&mongoID); err != nil {
-				continue
-			}
-
-			objID, err := primitive.ObjectIDFromHex(mongoID)
-			if err != nil {
-				continue
-			}
-
+		// Try to get points from MongoDB
+		if objID, err := primitive.ObjectIDFromHex(mongoID); err == nil {
 			var achievement model.Achievement
-			err = r.mongoCollection.FindOne(ctx, bson.M{"_id": objID}).Decode(&achievement)
-			if err != nil {
-				continue
+			if err := r.mongoCollection.FindOne(ctx, bson.M{"_id": objID}).Decode(&achievement); err == nil {
+				points = achievement.Points
 			}
-
-			totalPoints += achievement.Points
 		}
-		mongoRows.Close()
 
-		topStudents = append(topStudents, &model.StudentStats{
-			StudentID:         studentID,
-			NIM:               nim,
-			Name:              name,
-			TotalAchievements: totalAchievements,
-			TotalPoints:       totalPoints,
-		})
+		if studentMap[studentID] == nil {
+			studentMap[studentID] = &model.StudentStats{
+				StudentID:         studentID,
+				NIM:               nim,
+				Name:              name,
+				TotalAchievements: 0,
+				TotalPoints:       0,
+			}
+		}
+
+		studentMap[studentID].TotalAchievements++
+		studentMap[studentID].TotalPoints += points
+	}
+
+	// Convert map to slice and sort by total points
+	var topStudents []*model.StudentStats
+	for _, student := range studentMap {
+		topStudents = append(topStudents, student)
+	}
+
+	// Sort by total points descending, then by achievements count
+	sort.Slice(topStudents, func(i, j int) bool {
+		if topStudents[i].TotalPoints == topStudents[j].TotalPoints {
+			return topStudents[i].TotalAchievements > topStudents[j].TotalAchievements
+		}
+		return topStudents[i].TotalPoints > topStudents[j].TotalPoints
+	})
+
+	// Limit results
+	if len(topStudents) > limit {
+		topStudents = topStudents[:limit]
 	}
 
 	return topStudents, nil

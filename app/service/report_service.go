@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 	"uas_be/app/model"
@@ -95,29 +96,84 @@ func (s *reportServiceImpl) GetStatistics(c *fiber.Ctx) error {
 
 	statusCount := make(map[string]int)
 	typeCount := make(map[string]int)
+	competitionLevelCount := make(map[string]int)
+	periodCount := make(map[string]int)
 	totalPoints := 0
+	verifiedCount := 0
+
+	// Initialize competition levels with default values
+	competitionLevels := []string{"school", "city", "provincial", "national", "international"}
+	for _, level := range competitionLevels {
+		competitionLevelCount[level] = 0
+	}
+
+	// Initialize achievement types with default values
+	achievementTypes := []string{"academic", "competition", "organization", "publication", "certification", "other"}
+	for _, atype := range achievementTypes {
+		typeCount[atype] = 0
+	}
 
 	for _, ach := range achievements {
 		statusCount[ach.Status]++
 		typeCount[ach.AchievementType]++
+
 		if ach.Status == "verified" {
 			totalPoints += ach.Points
+			verifiedCount++
+		}
+
+		// Count by competition level (from details)
+		if ach.Details != nil {
+			if level, ok := ach.Details["competition_level"].(string); ok {
+				competitionLevelCount[level]++
+			}
+		}
+
+		// Count by period (year from created_at)
+		year := ach.CreatedAt.Year()
+		yearStr := strconv.Itoa(year)
+		periodCount[yearStr]++
+	}
+
+	// Calculate verification rate
+	verificationRate := 0.0
+	if totalAchievements > 0 {
+		verificationRate = float64(verifiedCount) / float64(totalAchievements) * 100
+	}
+
+	// Get top students (only for admin view)
+	var topStudents []map[string]interface{}
+	if role == "Admin" {
+		studentStats, err := s.achievementRepo.GetTopStudents(10) // Get top 10 students
+		if err != nil {
+			// Log error but don't fail the request
+			fmt.Printf("Error getting top students: %v\n", err)
+			topStudents = []map[string]interface{}{}
+		} else {
+			for _, stat := range studentStats {
+				topStudents = append(topStudents, map[string]interface{}{
+					"StudentID":        stat.StudentID,
+					"AchievementCount": stat.TotalAchievements,
+					"TotalPoints":      stat.TotalPoints,
+				})
+			}
 		}
 	}
 
-	stats["total_achievements"] = totalAchievements
 	stats["by_status"] = statusCount
 	stats["by_type"] = typeCount
-	stats["total_points"] = totalPoints
-	stats["verified_achievements"] = statusCount["verified"]
-	stats["pending_achievements"] = statusCount["submitted"]
-	stats["draft_achievements"] = statusCount["draft"]
-	stats["rejected_achievements"] = statusCount["rejected"]
+	stats["by_competition_level"] = competitionLevelCount
+	stats["by_period"] = periodCount
+	stats["summary"] = map[string]interface{}{
+		"total":             totalAchievements,
+		"verification_rate": verificationRate,
+	}
+	stats["top_students"] = topStudents
 
-	return c.Status(fiber.StatusOK).JSON(model.APIResponse{
-		Status:  "success",
-		Message: "statistik berhasil diambil",
-		Data:    stats,
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status":  true,
+		"message": "statistics retrieved successfully",
+		"data":    stats,
 	})
 }
 
@@ -165,7 +221,7 @@ func (s *reportServiceImpl) GetStudentReport(c *fiber.Ctx) error {
 		if err != nil || lecturer == nil {
 			return helper.ErrorResponse(c, fiber.StatusInternalServerError, "gagal mengambil data lecturer")
 		}
-		
+
 		if student.AdvisorID != lecturer.ID {
 			return helper.ErrorResponse(c, fiber.StatusForbidden, "student ini bukan bimbingan anda")
 		}

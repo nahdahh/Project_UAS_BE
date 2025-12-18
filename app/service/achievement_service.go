@@ -315,7 +315,7 @@ func (s *achievementServiceImpl) CreateAchievement(c *fiber.Ctx) error {
 		Description:     req.Description,
 		Details:         req.Details,
 		Tags:            req.Tags,
-		Points:          req.Points,
+		Points:          0, // Points will be assigned by lecturer during verification
 	}
 
 	result, err := s.achievementRepo.CreateAchievement(achievement, student.ID)
@@ -410,9 +410,7 @@ func (s *achievementServiceImpl) UpdateAchievement(c *fiber.Ctx) error {
 	if req.Tags != nil {
 		achievement.Tags = *req.Tags
 	}
-	if req.Points != nil {
-		achievement.Points = *req.Points
-	}
+	// Points cannot be updated by students - only assigned during verification
 
 	if err := s.achievementRepo.UpdateAchievement(achievementID, &achievement.Achievement); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
@@ -515,14 +513,15 @@ func (s *achievementServiceImpl) SubmitAchievement(c *fiber.Ctx) error {
 
 // VerifyAchievement godoc
 // @Summary Verifikasi prestasi
-// @Description Memverifikasi prestasi yang telah disubmit (dosen wali/admin)
+// @Description Memverifikasi prestasi yang telah disubmit dan memberikan poin (dosen wali/admin)
 // @Tags Achievements
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Achievement ID"
+// @Param body body model.VerifyAchievementRequest true "Data verifikasi dengan poin"
 // @Success 200 {object} model.APIResponse{data=model.AchievementWithReference} "Prestasi berhasil diverifikasi"
-// @Failure 400 {object} model.APIResponse "Hanya prestasi submitted yang bisa diverify"
+// @Failure 400 {object} model.APIResponse "Format request tidak valid atau hanya prestasi submitted yang bisa diverify"
 // @Failure 401 {object} model.APIResponse "Anda bukan advisor dari student ini"
 // @Failure 403 {object} model.APIResponse "Mahasiswa tidak dapat memverifikasi prestasi"
 // @Failure 404 {object} model.APIResponse "Prestasi tidak ditemukan"
@@ -532,6 +531,21 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 	achievementID := c.Params("id")
 	verifiedBy := c.Locals("userID").(string)
 	role := c.Locals("role").(string)
+
+	var req model.VerifyAchievementRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "format request tidak valid: " + err.Error(),
+		})
+	}
+
+	if req.Points < 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "poin tidak boleh negatif",
+		})
+	}
 
 	achievement, err := s.achievementRepo.GetAchievementByID(achievementID)
 	if err != nil || achievement == nil {
@@ -581,6 +595,15 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 		}
 	}
 
+	// Update points in MongoDB before verifying
+	achievement.Points = req.Points
+	if err := s.achievementRepo.UpdateAchievement(achievementID, &achievement.Achievement); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
+			Status:  "error",
+			Message: "gagal update poin achievement",
+		})
+	}
+
 	if err := s.achievementRepo.VerifyAchievement(achievementID, verifiedBy); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(model.APIResponse{
 			Status:  "error",
@@ -588,7 +611,7 @@ func (s *achievementServiceImpl) VerifyAchievement(c *fiber.Ctx) error {
 		})
 	}
 
-	note := "Achievement verified"
+	note := "Achievement verified with " + strconv.Itoa(req.Points) + " points"
 	history := &model.AchievementHistory{
 		ID:            uuid.New().String(),
 		AchievementID: achievementID,

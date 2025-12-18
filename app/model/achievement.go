@@ -68,7 +68,7 @@ type CreateAchievementRequest struct {
 	Description     string                 `json:"description"`      // Deskripsi prestasi
 	Details         map[string]interface{} `json:"details"`          // Detail dinamis berdasarkan tipe
 	Tags            []string               `json:"tags"`             // Tag/kategori prestasi
-	Points          int                    `json:"points"`           // Poin prestasi
+	// Points field removed - points will be assigned by lecturer during verification
 }
 
 // UpdateAchievementRequest adalah request untuk update prestasi
@@ -78,5 +78,10 @@ type UpdateAchievementRequest struct {
 	Description     *string                 `json:"description"`
 	Details         *map[string]interface{} `json:"details"`
 	Tags            *[]string               `json:"tags"`
-	Points          *int                    `json:"points"`
+	// Points field removed - points cannot be updated by students
+}
+
+// VerifyAchievementRequest adalah request untuk verifikasi prestasi dengan poin
+type VerifyAchievementRequest struct {
+	Points int `json:"points" validate:"required,min=0"` // Poin yang diberikan dosen saat verifikasi
 }
